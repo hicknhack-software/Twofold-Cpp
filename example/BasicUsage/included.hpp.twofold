@@ -1,0 +1,20 @@
+#pragma once
+#include "TwofoldRuntime/Twofold.h"
+
+auto methodArgs(auto const& args) -> Twofold {
+  auto isFirst = true;
+  for (auto& arg : args) {
+    if (!isFirst) {
+        // use interpolation to preserve the whitespace
+        \#{", "}
+    }
+    isFirst = false;
+    // use backslash to avoid linebreaks
+        \#{arg}
+  }
+}
+auto showMethod(auto const& method) -> Twofold {
+        |function #{method.name}(#{(co_await methodArgs(method.args), "")}) {
+        |  #{method.body}
+        |}
+}

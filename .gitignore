@@ -1,0 +1,49 @@
+# C++ objects and libs
+
+*.slo
+*.lo
+*.o
+*.a
+*.la
+*.lai
+*.so
+*.dll
+*.dylib
+
+# Qt-es
+
+/.qmake.cache
+/.qmake.stash
+*.pro.user
+*.pro.user.*
+*.moc
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+Makefile*
+*-build-*
+
+# QtCreator
+
+*.autosave
+
+#QtCtreator Qml
+*.qmlproject.user
+*.qmlproject.user.*
+cache/
+node_modules/
+bin/
+vendor/include/
+*.user
+build/default_debug/debug/debug.bg
+build/default_debug/debug/debug.bg.lock
+build/default_debug/debug/genmodules/conan/5bdeffab4f48b878/modules/Catch2/module.qbs
+build/default_debug/debug/genmodules/conan/5bdeffab4f48b878/modules/catch2-with-main/module.qbs
+build/default_debug/debug/genmodules/conan/5bdeffab4f48b878/modules/nlohmann_json/module.qbs
+.vscode/launch.json
+.vscode/qbs-configurations.json
+default/default.bg
+default/genmodules/conan/5bdeffab4f48b878/modules/Catch2/module.qbs
+default/genmodules/conan/5bdeffab4f48b878/modules/nlohmann_json/module.qbs
+.vscode/settings.json
+/AGENT.md

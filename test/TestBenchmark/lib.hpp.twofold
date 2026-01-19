@@ -1,0 +1,4 @@
+auto lib_lines() -> Twofold {
+      |Line 1 included
+      |Line 2 incldued
+}

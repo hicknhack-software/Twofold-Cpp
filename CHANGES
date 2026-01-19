@@ -1,0 +1,5 @@
+Changes for 1.0.0 (to be released):
+ * full port to C++23 
+ * use catch2 for tests
+ * use conan for dependencies
+ * use qbs with OnlineSource as main build system

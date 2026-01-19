@@ -1,0 +1,6 @@
+[requires]
+nlohmann_json/3.12.0
+catch2/3.11.0
+
+[generators]
+QbsDeps

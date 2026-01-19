@@ -1,0 +1,17 @@
+#pragma once
+#include "TwofoldRuntime/Twofold.h"
+#include "included.hpp.twofold"
+
+auto generate(Data const& data) -> Twofold {
+        |function #{data.name}Class(#{(co_await methodArgs(data.args), "")}) {
+  for (auto& method : data.methods) {
+        =  co_await showMethod(method);
+  }
+        |
+        |  return {
+  for (auto& method : data.methods) {
+        |    "#{method.name}": #{method.name},
+  }
+        |  };
+        |}
+}
