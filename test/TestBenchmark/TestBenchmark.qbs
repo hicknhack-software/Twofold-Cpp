@@ -1,9 +1,6 @@
 CppApplication {
     name: "TestBenchmark"
-
     consoleApplication: true
-    cpp.cxxLanguageVersion: "c++23"
-
     files: [
         "TestBenchmark.cpp",
         "benchmark.hpp.twofold",

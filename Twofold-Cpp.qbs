@@ -4,16 +4,25 @@ Project {
     name: "Twofold-Cpp"
 
     property string version: "2.0.0"
+    property string configProductName: "TwofoldConfig"
+    property bool enableQbsImports: (sourceDirectory === path)
     property bool enableTests: (sourceDirectory === path)
     property bool enableExamples: (sourceDirectory === path)
-    property bool enableOtherFiles: (sourceDirectory === path)
+    property bool enableThirdParty: true
 
     minimumQbsVersion: "3.1"
-    qbsModuleProviders: "conan"
-    references: [
-        "third_party/third_party.qbs"
-    ]
+    qbsSearchPaths: enableQbsImports ? ["qbs"] : []
 
+    Product {
+        name: "TwofoldConfig"
+        condition: configProductName === "TwofoldConfig"
+
+        Export {
+            cpp.cxxLanguageVersion: "c++23"
+
+            Depends { name: "cpp" }
+        }
+    }
     StaticLibrary {
         name: "TwofoldGeneratorLibrary"
         version: parent.version
@@ -23,7 +32,7 @@ Project {
         Depends { name: "cpp" }
         Depends { name: "SourceMapLibrary" }
         Export {
-            cpp.includePaths: exportingProduct.sourceDirectory + "/src/Generator"
+            cpp.includePaths: FileInfo.joinPaths(exportingProduct.sourceDirectory + "/src/Generator")
 
             Depends { name: "cpp" }
             Depends { name: "SourceMapLibrary" }
@@ -92,7 +101,7 @@ Project {
         name: "TwofoldCodeGen"
 
         Export {
-            cpp.includePaths: [ importingProduct.buildDirectory + "/twofold-generated/" ]
+            cpp.includePaths: [ FileInfo.joinPaths(importingProduct.buildDirectory, "twofold-generated") ]
 
             additionalProductTypes: ["hpp", "cpp"]
 
@@ -122,7 +131,7 @@ Project {
                         for (var i = 0; i < inputs[inTag].length; i++) {
                             var input = inputs["hpp-twofold"][i];
                             artifacts.push({
-                                filePath: product.buildDirectory + "/twofold-generated/" + input.completeBaseName,
+                                filePath: FileInfo.joinPaths(product.buildDirectory, "twofold-generated", input.completeBaseName),
                                 fileTags: [inTag.substring(0, 3)]
                             });
                         }
@@ -138,7 +147,7 @@ Project {
                         if (!inputs[inTag]) continue;
                         for (var i = 0; i < inputs[inTag].length; i++) {
                             var inputFilePath = inputs[inTag][i].filePath;
-                            var args = ["-i", inputFilePath, "-o", product.buildDirectory + "/twofold-generated/"];
+                            var args = ["-i", inputFilePath, "-o", FileInfo.joinPaths(product.buildDirectory, "twofold-generated")];
                             var cmd = new Command(executablePath, args);
                             cmd.description = "folding " + FileInfo.relativePath(product.sourceDirectory, inputFilePath);
                             cmd.highlight = "codegen";
@@ -150,7 +159,6 @@ Project {
             }
         }
     }
-
     StaticLibrary {
         name: "TwofoldRuntimeLibrary"
         version: parent.version
@@ -160,7 +168,7 @@ Project {
         Depends { name: "cpp" }
         Depends { name: "SourceMapLibrary" }
         Export {
-            cpp.includePaths: exportingProduct.sourceDirectory + "/src/Runtime"
+            cpp.includePaths: FileInfo.joinPaths(exportingProduct.sourceDirectory, "/src/Runtime")
 
             Depends { name: "cpp" }
             Depends { name: "SourceMapLibrary" }
@@ -181,42 +189,6 @@ Project {
             ]
         }
     }
-
-    StaticLibrary {
-        name: "TwofoldLibrary"
-        version: "2.0.0"
-        condition: false
-
-        Depends { name: "cpp" }
-        cpp.cxxLanguageVersion: "c++23"
-        cpp.includePaths: "src"
-
-        Depends { name: "SourceMapLibrary" }
-
-        Export {
-            Depends { name: "cpp" }
-            cpp.cxxLanguageVersion: "c++23"
-            cpp.includePaths: exportingProduct.sourceDirectory + "/src"
-            Depends { name: "SourceMapLibrary" }
-        }
-
-        Group {
-            name: "sources"
-            prefix: "src/Twofold/"
-            files: [
-                "BacktraceFilePosition.h",
-                "Engine.cpp",
-                "Engine.h",
-                "PathTextFileLoader.cpp",
-                "PathTextFileLoader.h",
-                "intern/find_last.h",
-                "intern/QCharHelper.h",
-                "intern/QStringHelper.h",
-                "intern/QtScriptTargetBuilderApi.cpp",
-                "intern/QtScriptTargetBuilderApi.h",
-            ]
-        }
-    }
     SubProject {
         condition: parent.enableTests
         filePath: "test/test.qbs"
@@ -225,11 +197,14 @@ Project {
         condition: parent.enableExamples
         filePath: "example/example.qbs"
     }
+    SubProject {
+        condition: parent.enableThirdParty
+        filePath: "third_party/third_party.qbs"
+    }
     Product {
         name: "[fwofold other files]"
         files: [
-            ".buildbot.yml",
-            "conanfile.txt",
+            ".clang-format",
             "CHANGES",
             "LICENSE",
             "NOTICE",

@@ -1,14 +1,32 @@
+import online
+
 Project {
+  id: root
+
   name: "ThirdParty"
 
-  // note: provided through conan for now
-  // OnlineProduct {
-  //     name: "nlohmann_json"
-  //     uri: "gh:nlohmann/json@3.12.0"
+  // note: potential override of source versions
+  // online.Source {
+  //   id: source
+  //   name: "catch2"
+  //   uri: "gh:catchorg/catch2@3.12.0"
   // }
-  // note: You need the Qbs patch from https://github.com/hicknhack-software/Qt-Qbs/tree/feature/OnlineSource
-  OnlineSubProject {
-      name: "SourceMap"
-      uri: "gh:hicknhack-software/SourceMap-Cpp#610de35e3fb38d5286e5dea56c7abf21e7637dc7"
+  // online.Source {
+  //   id: source
+  //   name: "nlohmann_json"
+  //   uri: "gh:nlohmann/json@3.12.0"
+  // }
+
+  online.Source {
+    id: sourceMap
+    name: "SourceMap"
+    uri: "gh:hicknhack-software/SourceMap-Cpp#ee4759af5e939a2f40420915b26c3abcfca6e797"
+  }
+  online.QbsProject {
+    source: sourceMap
+
+    Properties {
+      configProductName: root.parent.configProductName
+    }
   }
 }

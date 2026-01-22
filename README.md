@@ -28,12 +28,6 @@ We faced these challenges and Twofold is the result.
   * Tested with GCC 15.2 and Clang 21
   * Tested with Visual Studio 2026 Community Edition Compiler
   * Other compilers might work, but are not currently tested
-* Conan
-  * `conan profile detect`
-  * `conan install . -g=QbsDeps --output-folder=R:\twofold-debug --build missing --settings=build_type=Debug`
-  * `conan install . -g=QbsDeps --output-folder=R:\twofold-release --build missing --settings=build_type=Release`
-  * VsCode: `"moduleProviders.conan.installDirectory": "R:\\twofold-debug"` to `.vscode/qbs-cconfiguration.json` and same for release
-  * QtCreator: `moduleProviders.conan.installDirectory:R:\twofold-debug` to qbs build arguments and same for release
 
 ## How does it work?
 
