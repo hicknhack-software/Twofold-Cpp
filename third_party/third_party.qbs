@@ -19,6 +19,7 @@ Project {
 
   online.Source {
     id: sourceMap
+
     name: "SourceMap"
     uri: "gh:hicknhack-software/SourceMap-Cpp#ee4759af5e939a2f40420915b26c3abcfca6e797"
   }

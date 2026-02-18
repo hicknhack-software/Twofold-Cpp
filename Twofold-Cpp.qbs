@@ -32,7 +32,7 @@ Project {
         Depends { name: "cpp" }
         Depends { name: "SourceMapLibrary" }
         Export {
-            cpp.includePaths: FileInfo.joinPaths(exportingProduct.sourceDirectory + "/src/Generator")
+            cpp.includePaths: FileInfo.joinPaths(exportingProduct.sourceDirectory, "src", "Generator")
 
             Depends { name: "cpp" }
             Depends { name: "SourceMapLibrary" }
@@ -82,13 +82,23 @@ Project {
             ]
         }
     }
+    Product {
+        name: "TwofoldApp"
+
+        Export {
+            Group {
+                filesAreTargets: true
+                fileTagsFilter: "application"
+                fileTags: "twofold-app"
+            }
+        }
+    }
     Application {
         name: "TwofoldGenerator"
         targetName: "TwofoldGenerator"
         version: parent.version
-        type: base.concat(["twofoldgen_app"])
+        type: base.concat(["twofold-app"])
 
-        Depends { name: "TwofoldGeneratorLibrary" }
         Group {
             name: "sources"
             prefix: "src/Generator/"
@@ -96,6 +106,8 @@ Project {
                 "main.cpp"
             ]
         }
+        Depends { name: "TwofoldApp" }
+        Depends { name: "TwofoldGeneratorLibrary" }
     }
     Product {
         name: "TwofoldCodeGen"
@@ -105,9 +117,6 @@ Project {
 
             additionalProductTypes: ["hpp", "cpp"]
 
-            Depends { name: "TwofoldGenerator" }
-            Depends { name: "TwofoldRuntimeLibrary" }
-            Depends { name: "cpp" }
             FileTagger {
                 patterns: ["*.hpp.twofold", "*.hxx.twofold", "*.hh.twofold", "*.h.twofold"]
                 fileTags: ["hpp-twofold"]
@@ -119,7 +128,7 @@ Project {
             Rule {
                 multiplex: true
                 inputs: ["hpp-twofold", "cpp-twofold"]
-                inputsFromDependencies: ["application"]
+                inputsFromDependencies: ["twofold-app"]
                 outputFileTags: ["hpp", "cpp"]
                 outputArtifacts: {
                     var artifacts = [];
@@ -140,7 +149,7 @@ Project {
                 }
                 prepare: {
                     var cmds = [];
-                    var executablePath = inputs["application"][0].filePath;
+                    var executablePath = inputs["twofold-app"][0].filePath;
                     var tags = ["hpp-twofold", "cpp-twofold"];
                     for (var t = 0; t < tags.length; t++) {
                         var inTag = tags[t];
@@ -157,6 +166,9 @@ Project {
                     return cmds;
                 }
             }
+            Depends { name: "TwofoldGenerator" }
+            Depends { name: "TwofoldRuntimeLibrary" }
+            Depends { name: "cpp" }
         }
     }
     StaticLibrary {
