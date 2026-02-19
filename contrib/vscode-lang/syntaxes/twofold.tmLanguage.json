@@ -1,0 +1,250 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Twofold",
+	"scopeName": "source.twofold",
+	"fileTypes": [".twofold"],
+	"patterns": [
+		{
+			"include": "#twofold-directives"
+		},
+		{
+			"include": "#cpp-code"
+		}
+	],
+	"repository": {
+		"twofold-directives": {
+			"patterns": [
+				{
+					"comment": "Output line with line break (|)",
+					"match": "^(\\s*)(\\|)(.*)$",
+					"captures": {
+						"1": {
+							"name": "punctuation.whitespace.twofold"
+						},
+						"2": {
+							"name": "keyword.control.output.linebreak.twofold"
+						},
+						"3": {
+							"patterns": [
+								{
+									"include": "#interpolation"
+								},
+								{
+									"include": "#cpp-output-content"
+								}
+							]
+						}
+					}
+				},
+				{
+					"comment": "Output line without line break (\\)",
+					"match": "^(\\s*)(\\\\)(.*)$",
+					"captures": {
+						"1": {
+							"name": "punctuation.whitespace.twofold"
+						},
+						"2": {
+							"name": "keyword.control.output.no-linebreak.twofold"
+						},
+						"3": {
+							"patterns": [
+								{
+									"include": "#interpolation"
+								},
+								{
+									"include": "#cpp-output-content"
+								}
+							]
+						}
+					}
+				},
+				{
+					"comment": "Include directive (#)",
+					"match": "^(\\s*)(#)\\s*(include)\\s+(\"[^\"]+\"|<[^>]+>)",
+					"captures": {
+						"1": {
+							"name": "punctuation.whitespace.twofold"
+						},
+						"2": {
+							"name": "keyword.control.include.twofold"
+						},
+						"3": {
+							"name": "keyword.control.directive.include.twofold"
+						},
+						"4": {
+							"name": "string.quoted.double.twofold"
+						}
+					}
+				},
+				{
+					"comment": "Indentation change directive (=)",
+					"begin": "^(\\s*)(=)",
+					"beginCaptures": {
+						"1": {
+							"name": "punctuation.whitespace.twofold"
+						},
+						"2": {
+							"name": "keyword.control.indentation.twofold"
+						}
+					},
+					"end": "$",
+					"contentName": "meta.embedded.block.cpp",
+					"patterns": [
+						{
+							"include": "source.cpp"
+						}
+					]
+				}
+			]
+		},
+		"interpolation": {
+			"comment": "Interpolation #{...}",
+			"begin": "(#\\{)",
+			"beginCaptures": {
+				"1": {
+					"name": "punctuation.definition.interpolation.begin.twofold"
+				}
+			},
+			"end": "(\\})",
+			"endCaptures": {
+				"1": {
+					"name": "punctuation.definition.interpolation.end.twofold"
+				}
+			},
+			"name": "meta.interpolation.twofold",
+			"contentName": "meta.embedded.block.cpp",
+			"patterns": [
+				{
+					"include": "source.cpp"
+				}
+			]
+		},
+		"cpp-output-content": {
+			"comment": "C++ output content (strings, keywords, etc.)",
+			"patterns": [
+				{
+					"comment": "String literals in output",
+					"begin": "\"",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.begin.cpp"
+						}
+					},
+					"end": "\"",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.end.cpp"
+						}
+					},
+					"name": "string.quoted.double.cpp",
+					"patterns": [
+						{
+							"match": "\\\\.",
+							"name": "constant.character.escape.cpp"
+						},
+						{
+							"include": "#interpolation"
+						}
+					]
+				},
+				{
+					"comment": "Single quoted strings",
+					"begin": "'",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.begin.cpp"
+						}
+					},
+					"end": "'",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.definition.string.end.cpp"
+						}
+					},
+					"name": "string.quoted.single.cpp",
+					"patterns": [
+						{
+							"match": "\\\\.",
+							"name": "constant.character.escape.cpp"
+						},
+						{
+							"include": "#interpolation"
+						}
+					]
+				},
+				{
+					"comment": "C++ keywords in output",
+					"match": "\\b(function|return|if|else|for|while|do|switch|case|default|break|continue|goto|try|catch|throw|new|delete|class|struct|enum|union|namespace|using|template|typename|public|private|protected|virtual|override|final|const|static|extern|inline|constexpr|mutable|volatile|auto|void|int|char|short|long|float|double|bool|true|false|nullptr|this|operator|sizeof|alignof|typeid|decltype|noexcept|static_assert|thread_local|asm|export|register|restrict)\\b",
+					"name": "keyword.cpp"
+				},
+				{
+					"comment": "Numeric literals",
+					"match": "\\b(\\d+\\.?\\d*(?:[eE][+-]?\\d+)?[fFlLuU]*)\\b",
+					"name": "constant.numeric.cpp"
+				},
+				{
+					"comment": "Identifiers (function calls, variables)",
+					"match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b",
+					"name": "variable.other.cpp"
+				},
+				{
+					"comment": "Operators and punctuation",
+					"match": "([{}\\[\\]().,;:+\\-*/%&|^!<>?=]+)",
+					"name": "punctuation.cpp"
+				}
+			]
+		},
+		"cpp-code": {
+			"comment": "Regular C++ code lines (no twofold directive)",
+			"patterns": [
+				{
+					"comment": "C++ single-line comment",
+					"match": "//.*$",
+					"name": "comment.line.double-slash.cpp"
+				},
+				{
+					"comment": "C++ preprocessor directive",
+					"begin": "^(\\s*)(#)",
+					"beginCaptures": {
+						"2": {
+							"name": "punctuation.definition.directive.cpp"
+						}
+					},
+					"end": "$",
+					"name": "meta.preprocessor.cpp",
+					"patterns": [
+						{
+							"match": "\\b(include|define|undef|if|ifdef|ifndef|else|elif|endif|error|warning|pragma|line)\\b",
+							"name": "keyword.control.directive.cpp"
+						},
+						{
+							"begin": "\"",
+							"end": "\"",
+							"name": "string.quoted.double.include.cpp"
+						},
+						{
+							"begin": "<",
+							"end": ">",
+							"name": "string.quoted.other.lt-gt.include.cpp"
+						}
+					]
+				},
+				{
+					"comment": "Block of C++ code (lines not starting with twofold directives)",
+					"begin": "^(?=\\s*[^\\s|\\\\#=])",
+					"end": "(?=^\\s*[|\\\\#=])",
+					"beginCaptures": {
+						"0": {
+							"name": "meta.embedded.block.cpp"
+						}
+					},
+					"patterns": [
+						{
+							"include": "source.cpp"
+						}
+					]
+				}
+			]
+		}
+	}
+}

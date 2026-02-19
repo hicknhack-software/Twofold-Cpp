@@ -47,3 +47,4 @@ default/genmodules/conan/5bdeffab4f48b878/modules/Catch2/module.qbs
 default/genmodules/conan/5bdeffab4f48b878/modules/nlohmann_json/module.qbs
 .vscode/settings.json
 /AGENT.md
+*.vsix

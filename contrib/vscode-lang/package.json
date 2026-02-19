@@ -1,0 +1,71 @@
+{
+	"name": "twofold",
+	"displayName": "Twofold Language Support",
+	"description": "Syntax highlighting for Twofold template language",
+	"version": "0.1.0",
+	"publisher": "twofold",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"scripts": {
+		"package": "vsce package"
+	},
+	"devDependencies": {
+		"@vscode/vsce": "^3.0.0"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"contributes": {
+		"languages": [
+			{
+				"id": "twofold",
+				"aliases": [
+					"Twofold",
+					"twofold"
+				],
+				"extensions": [
+					".twofold"
+				],
+				"filenames": [],
+				"configuration": "./language-configuration.json"
+			},
+			{
+				"id": "twofold-cpp",
+				"aliases": [
+					"Twofold C++",
+					"twofold-cpp"
+				],
+				"extensions": [
+					".hpp.twofold",
+					".cpp.twofold",
+					".h.twofold",
+					".c.twofold",
+					".hxx.twofold",
+					".cxx.twofold",
+					".cc.twofold",
+					".hh.twofold"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "twofold",
+				"scopeName": "source.twofold",
+				"path": "./syntaxes/twofold.tmLanguage.json"
+			},
+			{
+				"language": "twofold-cpp",
+				"scopeName": "source.twofold.cpp",
+				"path": "./syntaxes/twofold-cpp.tmLanguage.json"
+			}
+		]
+	},
+	"icon": "icon.png",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/user/twofold-cpp.git"
+	}
+}
