@@ -37,7 +37,7 @@ Twofold is basically C++ that is extended with constructs to generate source cod
   \ indented output #{"interpolated"} without a line break
   | indented output #{"interpolated"} with a line break
   # include "indent_the_included_file.h.twofold"
-  = change_indentation_of_cpp()
+  = co_await change_indentation_of_cpp()
 // every line is regular C++
 ```
 
@@ -47,6 +47,11 @@ Every whitespace after is used as the indentation. Indentation is cumulative and
 
 **Hint:** Use the whitespaces before control characters to indent them in a column deeper than any surrounding C++.
 This gives you a visual splitter.
+
+The inline interpolation has three cases:
+1. The expression returns anything convertable to a string using std::to_string or std::string constructor.
+1. The expression returns void - the method is called, but not text is generated.
+1. The expression contains co_await - this method is invoked without any extra indentations.
 
 This is basically everything you need to know.
 
@@ -69,7 +74,7 @@ auto methodArgs(auto const& args) -> Twofold {
   }
 }
 auto showMethod(auto const& method) -> Twofold {
-        |function #{method.name}(#{methodArgs(method.args)}) {
+        |function #{method.name}(#{co_await methodArgs(method.args)}) {
         |  #{method.body}
         |}
 }
@@ -81,9 +86,9 @@ auto showMethod(auto const& method) -> Twofold {
 #include "included.hpp.twofold"
 
 auto generate(Data const& data) -> Twofold {
-        |function #{data.name}Class(#{methodArgs(data.args)}) {
+        |function #{data.name}Class(#{co_await methodArgs(data.args)}) {
   for (auto& method : data.methods) {
-        =  showMethod(method);
+        =  showMethod(method)
   }
         |
         |  return {

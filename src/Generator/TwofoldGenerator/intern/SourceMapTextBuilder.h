@@ -51,6 +51,10 @@ struct OriginNewLine {
     FilePosition origin; // position this entry is from
 };
 
+struct TargetText {
+    std::string text;
+};
+
 struct SourceMapText {
     SourceMapping const sourceMap;
     std::string const text;
@@ -71,6 +75,7 @@ public:
 
     auto operator<<(OriginText const& originText) -> SourceMapTextBuilder&;
     auto operator<<(OriginNewLine const& originNewLine) -> SourceMapTextBuilder&;
+    auto operator<<(TargetText const& targetText) -> SourceMapTextBuilder&;
     auto operator<<(NewLine const) -> SourceMapTextBuilder&;
 
 private:

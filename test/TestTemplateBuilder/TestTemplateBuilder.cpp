@@ -35,7 +35,7 @@ namespace {
 struct InterpolationTestData {
     std::string name;
     std::string templateText;
-    std::string expectedJavaScript;
+    std::string expectedCpp;
 };
 
 auto s_pos = [](int line, int col) {
@@ -55,10 +55,15 @@ auto s_expression = [](std::string text, int line, int col) {
     auto pos = s_pos(line, col);
     return std::format(
         "co_yield TwofoldRuntime::PushPartIndent{{{0}}};"
-        "co_yield TwofoldRuntime::AppendExpression{{{1}, {0}}};"
+        "co_yield TwofoldRuntime::AppendExpression{{TWOFOLD_EXPR({1}), {0}}};"
         "co_yield TwofoldRuntime::PopPartIndent{{}};\n",
         pos,
         text);
+};
+
+auto s_callExpression = [](std::string text, int line, int col) {
+    auto pos = s_pos(line, col);
+    return std::format("co_yield TwofoldRuntime::Append{{{0}}};", text);
 };
 
 } // namespace
@@ -110,7 +115,16 @@ TEST_CASE("TestTemplateBuilder Interpolation", "[interpolation]") {
         InterpolationTestData{
             "nested expr",
             "|#{'#{hello}'}",
-            s_indentPart("", 1, 2) + s_expression("'#{hello}'", 1, 4) + s_newLine(1, 15)});
+            s_indentPart("", 1, 2) + s_expression("'#{hello}'", 1, 4) + s_newLine(1, 15)},
+        InterpolationTestData{
+            "call expr shorthand",
+            "|#{co_await test()}",
+            s_indentPart("", 1, 2) + "co_await test();\n" + s_newLine(1, 20)},
+        InterpolationTestData{
+            "call expr shorthand with text",
+            "|prefix #{co_await test()} suffix",
+            s_indentPart("", 1, 2) + s_output("prefix ", 1, 2) + "co_await test();\n" + s_output(" suffix", 1, 27) +
+                s_newLine(1, 34)});
 
     SECTION(data.name) {
         auto messageHandler = std::make_shared<MessageHandlerMemory>();
@@ -127,7 +141,7 @@ TEST_CASE("TestTemplateBuilder Interpolation", "[interpolation]") {
         CAPTURE(data.name);
         CHECK(messageHandler->messages().empty());
         REQUIRE(fileHandler->savedFiles().size() == 1);
-        CHECK(fileHandler->savedFiles()[0].generatedContent == data.expectedJavaScript);
+        CHECK(fileHandler->savedFiles()[0].generatedContent == data.expectedCpp);
     }
 }
 

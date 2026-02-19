@@ -72,6 +72,11 @@ auto SourceMapTextBuilder::operator<<(OriginNewLine const& originNewLine) -> Sou
     return *this;
 }
 
+auto SourceMapTextBuilder::operator<<(TargetText const& targetText) -> SourceMapTextBuilder& {
+    m_textBuilder << targetText.text;
+    return *this;
+}
+
 auto SourceMapTextBuilder::operator<<(NewLine const) -> SourceMapTextBuilder& {
     m_textBuilder << NewLine();
     return *this;

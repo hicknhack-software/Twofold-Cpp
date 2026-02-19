@@ -76,19 +76,44 @@ auto CodeBuilder::operator<<(OriginScript const& script) -> CodeBuilder& {
     return *this;
 }
 
+auto CodeBuilder::operator<<(OriginScriptCall const& script) -> CodeBuilder& {
+    m_sourceMapBuilder << script.text;
+    if (script.text.span.end == script.text.span.begin || script.text.span.end[-1] != ';') {
+        static constexpr auto semicolon = std::string_view{";"};
+        auto const originLength = std::distance(script.text.span.begin, script.text.span.end);
+        m_sourceMapBuilder << buildOriginText(script.text.origin, originLength, semicolon, Interpolation::None); // ;
+    }
+    m_sourceMapBuilder << NewLine();
+    return *this;
+}
+
 auto CodeBuilder::operator<<(OriginScriptExpression const& expr) -> CodeBuilder& {
     if (0 == std::distance(expr.text.span.begin, expr.text.span.end)) return *this; // avoid empty script expressions
 
     auto const originLength = std::distance(expr.text.span.begin, expr.text.span.end);
     auto const originText = originPositionText(expr.text.origin);
 
-    auto const prefix = std::format(
-        "co_yield TwofoldRuntime::PushPartIndent{{{}}};co_yield TwofoldRuntime::AppendExpression{{", originText);
-    auto const postfix = std::format(", {}}};co_yield TwofoldRuntime::PopPartIndent{{}};", originText);
+    static constexpr auto coawaitView = std::string_view{"co_await"};
+    if (std::search(expr.text.span.begin, expr.text.span.end, coawaitView.begin(), coawaitView.end()) !=
+        expr.text.span.end) {
+        m_sourceMapBuilder << expr.text;
+        if (expr.text.span.end == expr.text.span.begin || expr.text.span.end[-1] != ';') {
+            static constexpr auto semicolon = std::string_view{";"};
+            m_sourceMapBuilder << buildOriginText(expr.text.origin, originLength, semicolon, Interpolation::None); // ;
+        }
+        m_sourceMapBuilder << NewLine();
+        return *this;
+    }
+    else {
+        auto const prefix = std::format(
+            "co_yield TwofoldRuntime::PushPartIndent{{{}}};co_yield TwofoldRuntime::AppendExpression{{TWOFOLD_EXPR(",
+            originText);
+        auto const postfix = std::format("), {}}};co_yield TwofoldRuntime::PopPartIndent{{}};", originText);
 
-    m_sourceMapBuilder << buildOriginText(expr.text.origin, -2, prefix, Interpolation::None); // #{
-    m_sourceMapBuilder << expr.text;
-    m_sourceMapBuilder << buildOriginText(expr.text.origin, originLength, postfix, Interpolation::None); // }
+        m_sourceMapBuilder << buildOriginText(expr.text.origin, -2, prefix, Interpolation::None); // #{
+        m_sourceMapBuilder << expr.text;
+        m_sourceMapBuilder << buildOriginText(expr.text.origin, originLength, postfix, Interpolation::None); // }
+    }
     m_sourceMapBuilder << NewLine();
     return *this;
 }
@@ -146,6 +171,11 @@ auto CodeBuilder::operator<<(PopTargetIndentation const& indent) -> CodeBuilder&
     m_sourceMapBuilder << OriginText{
         indent.text.origin, TextSpan{"co_yield TwofoldRuntime::PopIndentation{};"s}, Interpolation::None};
     m_sourceMapBuilder << NewLine();
+    return *this;
+}
+
+auto CodeBuilder::operator<<(TargetText const& targetText) -> CodeBuilder& {
+    m_sourceMapBuilder << targetText;
     return *this;
 }
 

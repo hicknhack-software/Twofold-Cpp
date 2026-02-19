@@ -42,7 +42,7 @@ void Call::operator()(FileLine const& line) const {
     }
 
     if (0 == depth) m_builder << PushTargetIndentation{OriginText{line, TextSpan{begin, end}}};
-    m_builder << OriginScript{OriginText{line, TextSpan{end, line.end}}};
+    m_builder << OriginScriptCall{OriginText{line, TextSpan{end, line.end}}};
     if (0 == depth) m_builder << PopTargetIndentation{OriginText{line, TextSpan{line.end, line.end}}};
 }
 

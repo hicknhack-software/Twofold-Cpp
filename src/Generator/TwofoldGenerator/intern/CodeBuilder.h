@@ -24,7 +24,17 @@
 
 namespace Twofold::intern {
 
-enum class OriginTextType { Part, Script, ScriptExpression, Target, IndentPart, PushIndention, PopIndention, NewLine };
+enum class OriginTextType {
+    Part,
+    Script,
+    ScriptCall,
+    ScriptExpression,
+    Target,
+    IndentPart,
+    PushIndention,
+    PopIndention,
+    NewLine
+};
 
 template<OriginTextType>
 struct OriginTextTemplate {
@@ -33,6 +43,7 @@ struct OriginTextTemplate {
 
 using OriginPart = OriginTextTemplate<OriginTextType::Part>;
 using OriginScript = OriginTextTemplate<OriginTextType::Script>;
+using OriginScriptCall = OriginTextTemplate<OriginTextType::ScriptCall>;
 using OriginScriptExpression = OriginTextTemplate<OriginTextType::ScriptExpression>;
 using OriginTarget = OriginTextTemplate<OriginTextType::Target>;
 using IndentTargetPart = OriginTextTemplate<OriginTextType::IndentPart>;
@@ -57,6 +68,7 @@ public:
 
     auto operator<<(OriginPart const&) -> CodeBuilder&;
     auto operator<<(OriginScript const&) -> CodeBuilder&;
+    auto operator<<(OriginScriptCall const&) -> CodeBuilder&;
     auto operator<<(OriginScriptExpression const&) -> CodeBuilder&;
     auto operator<<(OriginTarget const&) -> CodeBuilder&;
 
@@ -64,6 +76,7 @@ public:
     auto operator<<(PushTargetIndentation const&) -> CodeBuilder&;
     auto operator<<(PopTargetIndentation const&) -> CodeBuilder&;
 
+    auto operator<<(TargetText const&) -> CodeBuilder&;
     auto operator<<(TargetNewLine const) -> CodeBuilder&;
 
     auto operator<<(NewLine const) -> CodeBuilder&;

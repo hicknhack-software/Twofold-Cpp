@@ -14,7 +14,7 @@ auto methodArgs(auto const& args) -> Twofold {
   }
 }
 auto showMethod(auto const& method) -> Twofold {
-        |function #{method.name}(#{(co_await methodArgs(method.args), "")}) {
+        |function #{method.name}(#{co_await methodArgs(method.args)}) {
         |  #{method.body}
         |}
 }
