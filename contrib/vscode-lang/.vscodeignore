@@ -3,3 +3,8 @@
 node_modules/**
 *.vsix
 .gitignore
+src/**
+out/test-*
+tsconfig.json
+*.map
+*.d.ts

@@ -1,5 +1,4 @@
 # C++ objects and libs
-
 *.slo
 *.lo
 *.o
@@ -11,7 +10,6 @@
 *.dylib
 
 # Qt-es
-
 /.qmake.cache
 /.qmake.stash
 *.pro.user
@@ -24,27 +22,27 @@ Makefile*
 *-build-*
 
 # QtCreator
-
 *.autosave
 
 #QtCtreator Qml
 *.qmlproject.user
 *.qmlproject.user.*
+*.user
+
+# npm
 cache/
 node_modules/
 bin/
+out/
 vendor/include/
-*.user
-build/default_debug/debug/debug.bg
-build/default_debug/debug/debug.bg.lock
-build/default_debug/debug/genmodules/conan/5bdeffab4f48b878/modules/Catch2/module.qbs
-build/default_debug/debug/genmodules/conan/5bdeffab4f48b878/modules/catch2-with-main/module.qbs
-build/default_debug/debug/genmodules/conan/5bdeffab4f48b878/modules/nlohmann_json/module.qbs
+
+build/
+default/
+
 .vscode/launch.json
 .vscode/qbs-configurations.json
-default/default.bg
-default/genmodules/conan/5bdeffab4f48b878/modules/Catch2/module.qbs
-default/genmodules/conan/5bdeffab4f48b878/modules/nlohmann_json/module.qbs
 .vscode/settings.json
-/AGENT.md
+
 *.vsix
+/local_setup.md
+**/*.local.*

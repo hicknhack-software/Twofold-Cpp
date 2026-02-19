@@ -1,17 +1,23 @@
 {
 	"name": "twofold",
 	"displayName": "Twofold Language Support",
-	"description": "Syntax highlighting for Twofold template language",
-	"version": "0.1.0",
+	"description": "Syntax highlighting and formatting for Twofold template language",
+	"version": "0.2.2",
 	"publisher": "twofold",
 	"engines": {
 		"vscode": "^1.85.0"
 	},
+	"main": "./out/extension.js",
 	"scripts": {
+		"compile": "tsc -p ./",
+		"watch": "tsc -p ./ -w",
 		"package": "vsce package"
 	},
 	"devDependencies": {
-		"@vscode/vsce": "^3.0.0"
+		"@types/node": "^20.0.0",
+		"@types/vscode": "^1.85.0",
+		"@vscode/vsce": "^3.0.0",
+		"typescript": "^5.0.0"
 	},
 	"categories": [
 		"Programming Languages"
@@ -60,7 +66,22 @@
 				"scopeName": "source.twofold.cpp",
 				"path": "./syntaxes/twofold-cpp.tmLanguage.json"
 			}
-		]
+		],
+		"configuration": {
+			"title": "Twofold",
+			"properties": {
+				"twofold.targetColumn": {
+					"type": "number",
+					"default": 32,
+					"description": "Target column for output directives (|, \\, =) in twofold files."
+				},
+				"twofold.clangFormatPath": {
+					"type": "string",
+					"default": "",
+					"description": "Path to clang-format executable. Uses C_Cpp.clang_format_path if not set."
+				}
+			}
+		}
 	},
 	"icon": "icon.png",
 	"license": "Apache-2.0",

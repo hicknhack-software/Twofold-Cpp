@@ -31,12 +31,8 @@ OUTPUT_LINE_PATTERN = re.compile(r'^(\s*)([|\\])(.*)$')
 # Pattern to match indent directive: = followed by code
 INDENT_DIRECTIVE_PATTERN = re.compile(r'^(\s*)(=)(.*)$')
 
-# Marker for output lines during clang-format processing
-OUTPUT_MARKER_START = 'TWOFOLD_OUTPUT(R"TWOFOLD_RAW('
-OUTPUT_MARKER_END = ')TWOFOLD_RAW");'
-
-# Pattern to find our markers after clang-format
-RESTORE_PATTERN = re.compile(r'^(\s*)TWOFOLD_OUTPUT\(R"TWOFOLD_RAW\((.*)\)TWOFOLD_RAW"\);?$')
+# Placeholder for preserved lines during clang-format processing
+PRESERVED_LINE_PLACEHOLDER = 'TWOFOLD_PRESERVED_LINE'
 
 
 class TwofoldFormatter:
@@ -46,7 +42,7 @@ class TwofoldFormatter:
         self.clang_format_path = clang_format_path or self._find_clang_format()
         self.target_column = target_column
         self._inferred_column: Optional[int] = None
-        self._indent_directive_lines: list[tuple[int, str]] = []  # (line_number, original_line)
+        self._preserved_lines: list[tuple[int, str]] = []  # (line_number, original_line)
 
     @staticmethod
     def _find_clang_format() -> str:
@@ -97,41 +93,24 @@ class TwofoldFormatter:
     def _convert_to_cpp(self, lines: list[str]) -> list[str]:
         """
         Convert twofold file to formatable C++ code.
-        Replace output lines with TWOFOLD_OUTPUT markers.
-        Replace indent directives with placeholders.
+        Replace output lines and indent directives with placeholders.
         """
         converted = []
-        self._indent_directive_lines = []
-        
+        self._preserved_lines = []
+
         for line_num, line in enumerate(lines):
             indent, directive, content, original_line = self._classify_line(line)
-            
-            if directive in ('|', '\\'):
-                # Replace with marker, preserving indentation
-                # Escape any issues with raw string delimiters in content
-                safe_content = self._escape_raw_string_content(content)
-                converted.append(f"{indent}{OUTPUT_MARKER_START}{safe_content}{OUTPUT_MARKER_END}")
-            elif directive == '=':
+
+            if directive in ('|', '\\', '='):
                 # Store the original line for later restoration
-                self._indent_directive_lines.append((len(converted), original_line))
+                self._preserved_lines.append((len(converted), original_line))
                 # Replace with a placeholder
-                converted.append('TWOFOLD_INDENT_LINE')
+                converted.append(PRESERVED_LINE_PLACEHOLDER)
             else:
                 # Keep as-is (host code)
                 converted.append(line)
-        
-        return converted
 
-    def _escape_raw_string_content(self, content: str) -> str:
-        """
-        Escape content for use in raw string literal.
-        If the content contains the delimiter, we need to handle it.
-        """
-        # The delimiter is TWOFOLD_RAW)
-        # If content contains this sequence, we have a problem
-        # For now, we assume this is rare and leave content as-is
-        # (clang-format will preserve it anyway)
-        return content
+        return converted
 
     def _run_clang_format(self, content: str) -> str:
         """Run clang-format on the given content."""
@@ -151,35 +130,17 @@ class TwofoldFormatter:
                 f"clang-format not found at '{self.clang_format_path}'"
             ) from e
 
-    def _restore_output_lines(self, lines: list[str]) -> list[str]:
-        """Restore output lines from TWOFOLD_OUTPUT markers."""
-        restored = []
-        
-        for line in lines:
-            match = RESTORE_PATTERN.match(line)
-            if match:
-                indent, content = match.groups()
-                # Count how many pipes we've restored to determine the directive
-                # Actually, we need to preserve the original directive
-                # For simplicity, use | as the default (most common case)
-                # We've lost the original directive info, but | is the standard
-                restored.append(f"{indent}|{content}")
-            else:
-                restored.append(line)
-        
-        return restored
-
-    def _restore_indent_directives(self, lines: list[str]) -> list[str]:
+    def _restore_preserved_lines(self, lines: list[str]) -> list[str]:
         """
-        Restore indent directive lines from stored original lines.
+        Restore preserved lines (output directives and indent directives) from stored original lines.
         """
         result = list(lines)
-        
+
         # Replace placeholder lines with original content
-        for placeholder_idx, original_line in self._indent_directive_lines:
+        for placeholder_idx, original_line in self._preserved_lines:
             if placeholder_idx < len(result):
                 result[placeholder_idx] = original_line
-        
+
         return result
 
     def _realign_output_lines(self, lines: list[str], target_column: int) -> list[str]:
@@ -236,13 +197,10 @@ class TwofoldFormatter:
         cpp_content = '\n'.join(converted)
         formatted_cpp = self._run_clang_format(cpp_content)
         
-        # Step 3: Restore output lines
+        # Step 3: Restore preserved lines (output and indent directives)
         formatted_lines = formatted_cpp.splitlines()
-        restored = self._restore_output_lines(formatted_lines)
-        
-        # Step 3b: Restore indent directives (=)
-        restored = self._restore_indent_directives(restored)
-        
+        restored = self._restore_preserved_lines(formatted_lines)
+
         # Step 4: Realign output lines to target column
         restored = self._realign_output_lines(restored, effective_column)
         
