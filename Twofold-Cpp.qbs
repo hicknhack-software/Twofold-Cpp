@@ -82,22 +82,11 @@ Project {
             ]
         }
     }
-    Product {
-        name: "TwofoldApp"
-
-        Export {
-            Group {
-                filesAreTargets: true
-                fileTagsFilter: "application"
-                fileTags: "twofold-app"
-            }
-        }
-    }
     Application {
         name: "TwofoldGenerator"
         targetName: "TwofoldGenerator"
         version: parent.version
-        type: base.concat(["twofold-app"])
+        type: base.concat(["twofold-generator"])
 
         Group {
             name: "sources"
@@ -106,7 +95,11 @@ Project {
                 "main.cpp"
             ]
         }
-        Depends { name: "TwofoldApp" }
+        Group {
+            name: "binaries"
+            fileTagsFilter: "application"
+            fileTags: "twofold-generator"
+        }
         Depends { name: "TwofoldGeneratorLibrary" }
     }
     Product {
@@ -126,9 +119,8 @@ Project {
                 fileTags: ["cpp-twofold"]
             }
             Rule {
-                multiplex: true
                 inputs: ["hpp-twofold", "cpp-twofold"]
-                inputsFromDependencies: ["twofold-app"]
+                explicitlyDependsOnFromDependencies: ["twofold-generator"]
                 outputFileTags: ["hpp", "cpp"]
                 outputArtifacts: {
                     var artifacts = [];
@@ -149,7 +141,7 @@ Project {
                 }
                 prepare: {
                     var cmds = [];
-                    var executablePath = inputs["twofold-app"][0].filePath;
+                    var executablePath = explicitlyDependsOn["twofold-generator"][0].filePath;
                     var tags = ["hpp-twofold", "cpp-twofold"];
                     for (var t = 0; t < tags.length; t++) {
                         var inTag = tags[t];
