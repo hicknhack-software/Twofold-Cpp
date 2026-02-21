@@ -2,14 +2,26 @@ import * as path from 'path';
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 import type * as vscodeTypes from 'vscode';
+import { TextEncoder } from 'util';
 
 // Dynamic import for vscode to allow running outside VS Code (e.g., for testing)
-let vscodeModule: typeof vscodeTypes;
-async function getVscode() {
-	if (!vscodeModule) {
-		vscodeModule = await import('vscode');
+let vscodeModule: typeof vscodeTypes | null = null;
+let vscodeModuleError: Error | null = null;
+
+async function getVscode(): Promise<typeof vscodeTypes | null> {
+	if (vscodeModuleError) {
+		return null;
 	}
-	return vscodeModule;
+	if (vscodeModule) {
+		return vscodeModule;
+	}
+	try {
+		vscodeModule = await import('vscode');
+		return vscodeModule;
+	} catch (error) {
+		vscodeModuleError = error as Error;
+		return null;
+	}
 }
 
 interface LineClassification {
@@ -20,74 +32,45 @@ interface LineClassification {
 }
 
 export class TwofoldFormatter {
-	private clangFormatPath: string | null = null;
 	private targetColumn: number | null = null;
 	private inferredColumn: number | null = null;
 	private preservedLines: Array<{ lineNumber: number; originalLine: string }> = [];
+	private workspaceFolder: vscodeTypes.WorkspaceFolder | null = null;
+	private clangFormatPath: string | null = null; // Fallback for CLI testing
 
-	constructor(clangFormatPath: string | null, targetColumn: number | null) {
-		this.clangFormatPath = clangFormatPath;
+	constructor(targetColumn: number | null, workspaceFolder: vscodeTypes.WorkspaceFolder | null = null, clangFormatPath: string | null = null) {
 		this.targetColumn = targetColumn;
+		this.workspaceFolder = workspaceFolder;
+		this.clangFormatPath = clangFormatPath;
 	}
 
 	private static readonly OUTPUT_LINE_PATTERN = /^(\s*)([|\\])(.*)$/;
 	private static readonly INDENT_DIRECTIVE_PATTERN = /^(\s*)(=)(.*)$/;
 
 	public static async create(targetColumn: number | null): Promise<TwofoldFormatter> {
-		const vscodeModule = await getVscode();
-		const config = vscodeModule.workspace.getConfiguration('twofold');
-		const clangFormatPath = config.get<string>('clangFormatPath') ?? null;
+		const vscode = await getVscode();
+		if (!vscode) {
+			// VS Code not available (shouldn't happen in extension context)
+			return new TwofoldFormatter(targetColumn, null, null);
+		}
 
-		const formatter = new TwofoldFormatter(clangFormatPath, targetColumn);
-		await formatter.findClangFormat();
-		return formatter;
+		const config = vscode.workspace.getConfiguration('twofold');
+
+		// Get the active workspace folder
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0] ?? null;
+
+		return new TwofoldFormatter(targetColumn, workspaceFolder, null);
 	}
 
 	public static async createWithPath(clangFormatPath: string, targetColumn: number | null): Promise<TwofoldFormatter> {
-		const formatter = new TwofoldFormatter(clangFormatPath, targetColumn);
-		// Skip findClangFormat if path is already provided (for testing)
-		return formatter;
-	}
-
-	private async findClangFormat(): Promise<void> {
-		if (this.clangFormatPath) {
-			return;
+		// If we have a clang-format path, we can skip getting workspace (for CLI testing)
+		if (clangFormatPath) {
+			return new TwofoldFormatter(targetColumn, null, clangFormatPath);
 		}
-
-		// Try C_Cpp.clang_format_path first
-		const vscodeModule = await getVscode();
-		const cCppConfig = vscodeModule.workspace.getConfiguration('C_Cpp');
-		const cCppClangFormat = cCppConfig.get<string>('clang_format_path');
-
-		if (cCppClangFormat && cCppClangFormat.length > 0) {
-			this.clangFormatPath = cCppClangFormat;
-			return;
-		}
-
-		// Fall back to PATH search
-		const clangFormat = await TwofoldFormatter.findInPath('clang-format');
-		if (clangFormat) {
-			this.clangFormatPath = clangFormat;
-			return;
-		}
-
-		throw new Error('clang-format not found. Please set C_Cpp.clang_format_path or twofold.clangFormatPath.');
-	}
-
-	private static findInPath(command: string): Promise<string | null> {
-		return new Promise((resolve) => {
-			const isWindows = process.platform === 'win32';
-			const cmd = isWindows ? `where ${command}` : `which ${command}`;
-
-			child_process.exec(cmd, (error, stdout) => {
-				if (error || !stdout.trim()) {
-					resolve(null);
-					return;
-				}
-				const exePath = stdout.trim().split('\n')[0];
-				resolve(exePath);
-			});
-		});
+		// Otherwise, try to get workspace folder
+		const vscode = await getVscode();
+		const workspaceFolder = vscode?.workspace.workspaceFolders?.[0] ?? null;
+		return new TwofoldFormatter(targetColumn, workspaceFolder, clangFormatPath);
 	}
 
 	private inferTargetColumn(lines: string[]): number | null {
@@ -146,15 +129,85 @@ export class TwofoldFormatter {
 		return converted;
 	}
 
-	private runClangFormat(content: string): Promise<string> {
-		return new Promise((resolve, reject) => {
-			if (!this.clangFormatPath) {
-				reject(new Error('clang-format path not set'));
-				return;
+	private async runVsCodeFormat(content: string): Promise<string> {
+		// If we have a workspace folder and VS Code is available, use VS Code's formatting
+		if (this.workspaceFolder) {
+			const vscode = await getVscode();
+			if (vscode !== null) {
+				return this.runVsCodeFormatWithWorkspace(vscode, content);
+			}
+		}
+
+		// Fall back to direct clang-format if path is provided (for CLI testing)
+		if (this.clangFormatPath) {
+			return this.runClangFormatDirect(content);
+		}
+
+		console.warn('No workspace folder or clang-format path available, skipping formatting');
+		return content;
+	}
+
+	private async runVsCodeFormatWithWorkspace(vscode: typeof vscodeTypes, content: string): Promise<string> {
+		// Create a temporary file in the workspace
+		const tempFileName = `.temp_format_${Date.now()}.cpp`;
+		const tempFileUri = vscode.Uri.joinPath(this.workspaceFolder!.uri, tempFileName);
+
+		try {
+			// Write the unformatted code to a physical file
+			const contentBytes = new TextEncoder().encode(content);
+			await vscode.workspace.fs.writeFile(tempFileUri, contentBytes);
+
+			// Open the document in VS Code's memory
+			const document = await vscode.workspace.openTextDocument(tempFileUri);
+
+			// Request formatting edits from VS Code's standard formatter API
+			// This delegates to the C/C++ extension (ms-vscode.cpptools) which uses clang-format
+			const edits = await vscode.commands.executeCommand<vscodeTypes.TextEdit[]>(
+				'vscode.executeFormatDocumentProvider',
+				document.uri,
+				{ tabSize: 4, insertSpaces: true }
+			);
+
+			// If no edits, return original content
+			if (!edits || edits.length === 0) {
+				return content;
 			}
 
+			// Apply edits manually to get the formatted string
+			// Sort in reverse order (bottom-to-top) so edits don't shift offsets
+			const sortedEdits = edits.sort((a, b) =>
+				b.range.start.compareTo(a.range.start)
+			);
+
+			let formattedCode = document.getText();
+			for (const edit of sortedEdits) {
+				const startOffset = document.offsetAt(edit.range.start);
+				const endOffset = document.offsetAt(edit.range.end);
+				formattedCode =
+					formattedCode.substring(0, startOffset) +
+					edit.newText +
+					formattedCode.substring(endOffset);
+			}
+
+			return formattedCode;
+		} catch (error) {
+			console.error('VS Code formatting failed:', error);
+			// Fall back to returning original content on error
+			return content;
+		} finally {
+			// Clean up the temporary file
+			try {
+				await vscode.workspace.fs.delete(tempFileUri);
+			} catch {
+				// Ignore cleanup errors
+			}
+		}
+	}
+
+	private runClangFormatDirect(content: string): Promise<string> {
+		return new Promise((resolve, reject) => {
 			// Use ColumnLimit: 0 to prevent line wrapping (keeps raw strings on single lines)
-			const child = child_process.spawn(this.clangFormatPath, ['-style={ColumnLimit: 0}'], {
+			const child = child_process.spawn(this.clangFormatPath!, ['-style={ColumnLimit: 0}'], {
 				stdio: ['pipe', 'pipe', 'pipe']
 			});
 
@@ -265,9 +318,9 @@ export class TwofoldFormatter {
 		// Step 1: Convert to formatable C++
 		const converted = this.convertToCpp(lines);
 
-		// Step 2: Run clang-format
+		// Step 2: Run VS Code formatting (delegates to C/C++ extension/clang-format)
 		const cppContent = converted.join('\n');
-		const formattedCpp = await this.runClangFormat(cppContent);
+		const formattedCpp = await this.runVsCodeFormat(cppContent);
 
 		// Step 3: Restore preserved lines (output and indent directives)
 		let formattedLines = formattedCpp.split('\n');
@@ -299,20 +352,28 @@ export class TwicefoldDocumentFormatter implements vscodeTypes.DocumentFormattin
 		options: vscodeTypes.FormattingOptions,
 		token: vscodeTypes.CancellationToken
 	): Promise<vscodeTypes.TextEdit[]> {
-		const vscodeModule = await getVscode();
-		const config = vscodeModule.workspace.getConfiguration('twofold');
+		const vscode = await getVscode();
+		if (!vscode) {
+			// Shouldn't happen in VS Code context, but handle gracefully
+			return [];
+		}
+
+		const config = vscode.workspace.getConfiguration('twofold');
 		const targetColumn = config.get<number>('targetColumn') ?? 32;
 
-		const formatter = await TwofoldFormatter.create(targetColumn);
+		// Get the workspace folder from the document
+		const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri) ?? null;
+
+		const formatter = new TwofoldFormatter(targetColumn, workspaceFolder, null);
 
 		const content = document.getText();
 		const formatted = await formatter.formatContent(content);
 
-		const fullRange = new vscodeModule.Range(
+		const fullRange = new vscode.Range(
 			document.positionAt(0),
 			document.positionAt(content.length)
 		);
 
-		return [vscodeModule.TextEdit.replace(fullRange, formatted)];
+		return [vscode.TextEdit.replace(fullRange, formatted)];
 	}
 }
