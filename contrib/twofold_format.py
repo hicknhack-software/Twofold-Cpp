@@ -103,9 +103,10 @@ class TwofoldFormatter:
 
             if directive in ('|', '\\', '='):
                 # Store the original line for later restoration
-                self._preserved_lines.append((len(converted), original_line))
-                # Replace with a placeholder
-                converted.append(PRESERVED_LINE_PLACEHOLDER)
+                line_num = len(converted)
+                self._preserved_lines.append((line_num, original_line))
+                # Replace with a unique placeholder (add semicolon to make valid C++)
+                converted.append(f'TWOFOLD_LINE_{line_num};')
             else:
                 # Keep as-is (host code)
                 converted.append(line)
@@ -133,13 +134,22 @@ class TwofoldFormatter:
     def _restore_preserved_lines(self, lines: list[str]) -> list[str]:
         """
         Restore preserved lines (output directives and indent directives) from stored original lines.
+        Uses unique markers to find the correct lines after clang-format may have reordered them.
         """
         result = list(lines)
 
-        # Replace placeholder lines with original content
+        # Build a map of markers to original lines
+        marker_to_original = {}
         for placeholder_idx, original_line in self._preserved_lines:
-            if placeholder_idx < len(result):
-                result[placeholder_idx] = original_line
+            marker = f'TWOFOLD_LINE_{placeholder_idx};'
+            marker_to_original[marker] = original_line
+
+        # Replace markers with original content
+        for i, line in enumerate(result):
+            for marker, original_line in marker_to_original.items():
+                if marker in line:
+                    result[i] = original_line
+                    break
 
         return result
 

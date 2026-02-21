@@ -32,8 +32,6 @@ export class TwofoldFormatter {
 
 	private static readonly OUTPUT_LINE_PATTERN = /^(\s*)([|\\])(.*)$/;
 	private static readonly INDENT_DIRECTIVE_PATTERN = /^(\s*)(=)(.*)$/;
-	// Placeholder for preserved lines during clang-format processing
-	private static readonly PRESERVED_LINE_PLACEHOLDER = 'TWOFOLD_PRESERVED_LINE';
 
 	public static async create(targetColumn: number | null): Promise<TwofoldFormatter> {
 		const vscodeModule = await getVscode();
@@ -135,9 +133,10 @@ export class TwofoldFormatter {
 
 			if (directive === '|' || directive === '\\' || directive === '=') {
 				// Store the original line for later restoration
-				this.preservedLines.push({ lineNumber: converted.length, originalLine });
-				// Replace with a placeholder
-				converted.push(TwofoldFormatter.PRESERVED_LINE_PLACEHOLDER);
+				const lineNumber = converted.length;
+				this.preservedLines.push({ lineNumber, originalLine });
+				// Replace with a unique placeholder (add semicolon to make valid C++)
+				converted.push(`TWOFOLD_LINE_${lineNumber};`);
 			} else {
 				// Keep as-is (host code)
 				converted.push(line);
@@ -190,10 +189,20 @@ export class TwofoldFormatter {
 	private restorePreservedLines(lines: string[]): string[] {
 		const result = [...lines];
 
-		// Replace placeholder lines with original content
+		// Build a map of markers to original lines
+		const markerToOriginal = new Map<string, string>();
 		for (const { lineNumber, originalLine } of this.preservedLines) {
-			if (lineNumber < result.length) {
-				result[lineNumber] = originalLine;
+			const marker = `TWOFOLD_LINE_${lineNumber};`;
+			markerToOriginal.set(marker, originalLine);
+		}
+
+		// Replace markers with original content
+		for (let i = 0; i < result.length; i++) {
+			for (const [marker, originalLine] of markerToOriginal) {
+				if (result[i].includes(marker)) {
+					result[i] = originalLine;
+					break;
+				}
 			}
 		}
 
