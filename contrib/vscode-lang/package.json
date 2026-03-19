@@ -2,8 +2,8 @@
 	"name": "twofold",
 	"displayName": "Twofold Language Support",
 	"description": "Syntax highlighting and formatting for Twofold template language",
-	"version": "0.2.2",
-	"publisher": "twofold",
+	"version": "0.2.4",
+	"publisher": "hicknhack-software",
 	"engines": {
 		"vscode": "^1.85.0"
 	},
@@ -87,6 +87,6 @@
 	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/user/twofold-cpp.git"
+		"url": "https://github.com/hicknhack-software/Twofold-Cpp.git"
 	}
 }

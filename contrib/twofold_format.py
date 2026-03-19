@@ -75,10 +75,6 @@ class TwofoldFormatter:
         match = OUTPUT_LINE_PATTERN.match(line)
         if match:
             indent, directive, content = match.groups()
-            # Check if this is actually an escape sequence \#{ or \#
-            if directive == '\\' and content.startswith('#'):
-                # This is an escape sequence, treat as host code
-                return '', '', '', line
             return indent, directive, content, line
         
         # Check for indent directive (=)
@@ -134,22 +130,42 @@ class TwofoldFormatter:
     def _restore_preserved_lines(self, lines: list[str]) -> list[str]:
         """
         Restore preserved lines (output directives and indent directives) from stored original lines.
-        Uses unique markers to find the correct lines after clang-format may have reordered them.
+        Uses unique markers to find the correct lines after clang-format may have reordered or MERGED them.
         """
-        result = list(lines)
+        result = []
 
-        # Build a map of markers to original lines
-        marker_to_original = {}
-        for placeholder_idx, original_line in self._preserved_lines:
-            marker = f'TWOFOLD_LINE_{placeholder_idx};'
-            marker_to_original[marker] = original_line
+        # Build a map of markers (number) to original lines
+        marker_to_original = {num: line for num, line in self._preserved_lines}
 
-        # Replace markers with original content
-        for i, line in enumerate(result):
-            for marker, original_line in marker_to_original.items():
-                if marker in line:
-                    result[i] = original_line
-                    break
+        for line in lines:
+            search_again = True
+            while search_again:
+                search_again = False
+                for line_num, original_line in marker_to_original.items():
+                    # Regex to find marker, allowing for variations in whitespace around semicolon
+                    marker_pattern = rf'TWOFOLD_LINE_{line_num}\s*;'
+                    match = re.search(marker_pattern, line)
+                    
+                    if match:
+                        start, end = match.span()
+                        before = line[:start]
+                        after = line[end:]
+                        
+                        # If there was code before the marker on the same line, push it
+                        if before.strip():
+                            result.append(before)
+                            
+                        # Push the original twofold line
+                        result.append(original_line)
+                        
+                        # Continue searching in the 'after' part
+                        line = after
+                        search_again = True
+                        break
+            
+            # If there's anything left on the line (like merged C++ code), push it
+            if line.strip():
+                result.append(line)
 
         return result
 

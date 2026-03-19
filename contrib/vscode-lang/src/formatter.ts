@@ -88,10 +88,6 @@ export class TwofoldFormatter {
 		let match = line.match(TwofoldFormatter.OUTPUT_LINE_PATTERN);
 		if (match) {
 			const [, indent, directive, content] = match;
-			// Check if this is actually an escape sequence \#{ or \#
-			if (directive === '\\' && content.startsWith('#')) {
-				return { indent: '', directive: '', content: '', originalLine: line };
-			}
 			return { indent, directive, content, originalLine: line };
 		}
 
@@ -240,22 +236,47 @@ export class TwofoldFormatter {
 	}
 
 	private restorePreservedLines(lines: string[]): string[] {
-		const result = [...lines];
+		const result: string[] = [];
 
 		// Build a map of markers to original lines
-		const markerToOriginal = new Map<string, string>();
+		const markerToOriginal = new Map<number, string>();
 		for (const { lineNumber, originalLine } of this.preservedLines) {
-			const marker = `TWOFOLD_LINE_${lineNumber};`;
-			markerToOriginal.set(marker, originalLine);
+			markerToOriginal.set(lineNumber, originalLine);
 		}
 
-		// Replace markers with original content
-		for (let i = 0; i < result.length; i++) {
-			for (const [marker, originalLine] of markerToOriginal) {
-				if (result[i].includes(marker)) {
-					result[i] = originalLine;
-					break;
+		for (let line of lines) {
+			let searchAgain = true;
+			while (searchAgain) {
+				searchAgain = false;
+				for (const [lineNumber, originalLine] of markerToOriginal) {
+					// Regex to find marker, allowing for variations in whitespace around semicolon
+					const markerRegex = new RegExp(`TWOFOLD_LINE_${lineNumber}\\s*;`);
+					const match = line.match(markerRegex);
+					
+					if (match) {
+						const index = match.index!;
+						const markerLength = match[0].length;
+						const before = line.substring(0, index);
+						const after = line.substring(index + markerLength);
+						
+						// If there was code before the marker on the same line, push it
+						if (before.trim().length > 0) {
+							result.push(before);
+						}
+						
+						// Push the original twofold line
+						result.push(originalLine);
+						
+						// Continue searching in the 'after' part
+						line = after;
+						searchAgain = true;
+						break;
+					}
 				}
+			}
+			// If there's anything left on the line (like merged C++ code), push it
+			if (line.trim().length > 0) {
+				result.push(line);
 			}
 		}
 
