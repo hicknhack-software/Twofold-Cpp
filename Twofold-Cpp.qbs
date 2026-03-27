@@ -130,7 +130,7 @@ Project {
                         var inTag = tags[t];
                         if (!inputs[inTag]) continue;
                         for (var i = 0; i < inputs[inTag].length; i++) {
-                            var input = inputs["hpp-twofold"][i];
+                            var input = inputs[inTag][i];
                             artifacts.push({
                                 filePath: FileInfo.joinPaths(product.buildDirectory, "twofold-generated", input.completeBaseName),
                                 fileTags: [inTag.substring(0, 3)]
