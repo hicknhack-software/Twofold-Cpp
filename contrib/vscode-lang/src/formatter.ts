@@ -235,7 +235,7 @@ export class TwofoldFormatter {
 		});
 	}
 
-	private restorePreservedLines(lines: string[]): string[] {
+	private restorePreservedLines(lines: string[], targetColumn: number): string[] {
 		const result: string[] = [];
 
 		// Build a map of markers to original lines
@@ -244,74 +244,63 @@ export class TwofoldFormatter {
 			markerToOriginal.set(lineNumber, originalLine);
 		}
 
+		// Match any TWOFOLD_LINE_N pattern and extract N for direct Map lookup
+		const markerRegex = /^.*(TWOFOLD_LINE_(\d+)\s*;).*$/;
+
 		for (let line of lines) {
+			// Blank lines pass through unchanged (preserved from clang-format output)
+			if (line === '') {
+				result.push(line);
+				continue;
+			}
+
 			let searchAgain = true;
 			while (searchAgain) {
 				searchAgain = false;
-				for (const [lineNumber, originalLine] of markerToOriginal) {
-					// Regex to find marker, allowing for variations in whitespace around semicolon
-					const markerRegex = new RegExp(`TWOFOLD_LINE_${lineNumber}\\s*;`);
-					const match = line.match(markerRegex);
-					
-					if (match) {
-						const index = match.index!;
-						const markerLength = match[0].length;
+				const match = line.match(markerRegex);
+
+				if (match) {
+					const originalLine = markerToOriginal.get(parseInt(match[2], 10));
+					if (originalLine) {
+						const index = line.indexOf(match[1]);
+						const markerLength = match[1].length;
 						const before = line.substring(0, index);
 						const after = line.substring(index + markerLength);
-						
-						// If there was code before the marker on the same line, push it
+
+						// If there was code before the marker, push it with indentation
 						if (before.trim().length > 0) {
 							result.push(before);
 						}
-						
-						// Push the original twofold line
-						result.push(originalLine);
-						
+
+						// Push the original twofold line, optionally realigned to targetColumn
+						let outputLine = originalLine;
+						if (targetColumn > 0) {
+							// Check for output directive (| or \)
+							let directiveMatch = originalLine.match(TwofoldFormatter.OUTPUT_LINE_PATTERN);
+							if (directiveMatch) {
+								const newIndent = ' '.repeat(targetColumn);
+								outputLine = `${newIndent}${directiveMatch[2]}${directiveMatch[3]}`;
+							} else {
+								// Check for indent directive (=)
+								directiveMatch = originalLine.match(TwofoldFormatter.INDENT_DIRECTIVE_PATTERN);
+								if (directiveMatch) {
+									const newIndent = ' '.repeat(targetColumn);
+									outputLine = `${newIndent}${directiveMatch[2]}${directiveMatch[3]}`;
+								}
+							}
+						}
+						result.push(outputLine);
+
 						// Continue searching in the 'after' part
 						line = after;
 						searchAgain = true;
-						break;
 					}
 				}
 			}
-			// If there's anything left on the line (like merged C++ code), push it
+			// If there's anything left (non-marker content), push it
 			if (line.trim().length > 0) {
 				result.push(line);
 			}
-		}
-
-		return result;
-	}
-
-	private realignOutputLines(lines: string[], targetColumn: number): string[] {
-		// Only realign if targetColumn > 0 (explicit setting)
-		// If targetColumn is 0 (inferred), preserve clang-format's indentation
-		if (targetColumn <= 0) {
-			return lines;
-		}
-
-		const result: string[] = [];
-
-		for (const line of lines) {
-			// Check for output directive (| or \)
-			let match = line.match(TwofoldFormatter.OUTPUT_LINE_PATTERN);
-			if (match) {
-				const [, indent, directive, content] = match;
-				const newIndent = ' '.repeat(targetColumn);
-				result.push(`${newIndent}${directive}${content}`);
-				continue;
-			}
-
-			// Check for indent directive (=)
-			match = line.match(TwofoldFormatter.INDENT_DIRECTIVE_PATTERN);
-			if (match) {
-				const [, indent, directive, content] = match;
-				const newIndent = ' '.repeat(targetColumn);
-				result.push(`${newIndent}${directive}${content}`);
-				continue;
-			}
-
-			result.push(line);
 		}
 
 		return result;
@@ -343,12 +332,9 @@ export class TwofoldFormatter {
 		const cppContent = converted.join('\n');
 		const formattedCpp = await this.runVsCodeFormat(cppContent);
 
-		// Step 3: Restore preserved lines (output and indent directives)
+		// Step 3: Restore preserved lines (output and indent directives) with realignment
 		let formattedLines = formattedCpp.split('\n');
-		let restored = this.restorePreservedLines(formattedLines);
-
-		// Step 4: Realign output lines to target column
-		restored = this.realignOutputLines(restored, effectiveColumn);
+		let restored = this.restorePreservedLines(formattedLines, effectiveColumn);
 
 		return restored.join('\n') + '\n';
 	}

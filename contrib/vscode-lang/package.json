@@ -2,7 +2,7 @@
 	"name": "twofold",
 	"displayName": "Twofold Language Support",
 	"description": "Syntax highlighting and formatting for Twofold template language",
-	"version": "0.2.4",
+	"version": "0.2.7",
 	"publisher": "hicknhack-software",
 	"engines": {
 		"vscode": "^1.85.0"

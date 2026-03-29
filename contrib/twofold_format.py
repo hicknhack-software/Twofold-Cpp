@@ -127,74 +127,66 @@ class TwofoldFormatter:
                 f"clang-format not found at '{self.clang_format_path}'"
             ) from e
 
-    def _restore_preserved_lines(self, lines: list[str]) -> list[str]:
+    def _restore_preserved_lines(self, lines: list[str], target_column: int) -> list[str]:
         """
         Restore preserved lines (output directives and indent directives) from stored original lines.
         Uses unique markers to find the correct lines after clang-format may have reordered or MERGED them.
+        Combines realignment inline.
         """
         result = []
 
         # Build a map of markers (number) to original lines
         marker_to_original = {num: line for num, line in self._preserved_lines}
 
+        # Match any TWOFOLD_LINE_N pattern and extract N for direct dict lookup
+        marker_regex = re.compile(r'^.*(TWOFOLD_LINE_(\d+)\s*;).*$')
+
         for line in lines:
+            # Blank lines pass through unchanged (preserved from clang-format output)
+            if line == '':
+                result.append(line)
+                continue
+
             search_again = True
             while search_again:
                 search_again = False
-                for line_num, original_line in marker_to_original.items():
-                    # Regex to find marker, allowing for variations in whitespace around semicolon
-                    marker_pattern = rf'TWOFOLD_LINE_{line_num}\s*;'
-                    match = re.search(marker_pattern, line)
-                    
-                    if match:
-                        start, end = match.span()
+                match = marker_regex.match(line)
+
+                if match:
+                    original_line = marker_to_original.get(int(match.group(2)))
+                    if original_line:
+                        start, end = match.span(1)
                         before = line[:start]
                         after = line[end:]
-                        
+
                         # If there was code before the marker on the same line, push it
                         if before.strip():
                             result.append(before)
-                            
-                        # Push the original twofold line
-                        result.append(original_line)
-                        
+
+                        # Push the original twofold line, optionally realigned to target_column
+                        output_line = original_line
+                        if target_column > 0:
+                            # Check for output directive (| or \)
+                            directive_match = OUTPUT_LINE_PATTERN.match(original_line)
+                            if directive_match:
+                                indent, directive, content = directive_match.groups()
+                                output_line = f"{' ' * target_column}{directive}{content}"
+                            else:
+                                # Check for indent directive (=)
+                                directive_match = INDENT_DIRECTIVE_PATTERN.match(original_line)
+                                if directive_match:
+                                    indent, directive, content = directive_match.groups()
+                                    output_line = f"{' ' * target_column}{directive}{content}"
+                        result.append(output_line)
+
                         # Continue searching in the 'after' part
                         line = after
                         search_again = True
-                        break
-            
+
             # If there's anything left on the line (like merged C++ code), push it
             if line.strip():
                 result.append(line)
 
-        return result
-
-    def _realign_output_lines(self, lines: list[str], target_column: int) -> list[str]:
-        """
-        Realign output lines and indent directive lines to start at the target column.
-        Adjusts indentation so |, \\, or = appears at the target column.
-        """
-        result = []
-        
-        for line in lines:
-            # Check for output directive (| or \)
-            match = OUTPUT_LINE_PATTERN.match(line)
-            if match:
-                indent, directive, content = match.groups()
-                new_indent = ' ' * target_column
-                result.append(f"{new_indent}{directive}{content}")
-                continue
-            
-            # Check for indent directive (=)
-            match = INDENT_DIRECTIVE_PATTERN.match(line)
-            if match:
-                indent, directive, content = match.groups()
-                new_indent = ' ' * target_column
-                result.append(f"{new_indent}{directive}{content}")
-                continue
-            
-            result.append(line)
-        
         return result
 
     def format_content(self, content: str) -> str:
@@ -223,13 +215,10 @@ class TwofoldFormatter:
         cpp_content = '\n'.join(converted)
         formatted_cpp = self._run_clang_format(cpp_content)
         
-        # Step 3: Restore preserved lines (output and indent directives)
+        # Step 3: Restore preserved lines (output and indent directives) with realignment
         formatted_lines = formatted_cpp.splitlines()
-        restored = self._restore_preserved_lines(formatted_lines)
+        restored = self._restore_preserved_lines(formatted_lines, effective_column)
 
-        # Step 4: Realign output lines to target column
-        restored = self._realign_output_lines(restored, effective_column)
-        
         return '\n'.join(restored) + '\n'
 
     def format_file(self, filepath: Path, dry_run: bool = False) -> bool:
