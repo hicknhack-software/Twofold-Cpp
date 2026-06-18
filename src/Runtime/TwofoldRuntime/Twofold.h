@@ -24,18 +24,7 @@
 #include <utility>
 
 #define TWOFOLD_EXPR(expr)                                                                                             \
-    ([&]() {                                                                                                           \
-        if constexpr (std::is_void_v<decltype(expr)>) {                                                                \
-            expr;                                                                                                      \
-            return std::string{};                                                                                      \
-        }                                                                                                              \
-        else if constexpr (TwofoldRuntime::IsToStringable<decltype(expr)>) {                                           \
-            return std::to_string(expr);                                                                               \
-        }                                                                                                              \
-        else {                                                                                                         \
-            return std::string(expr);                                                                                  \
-        }                                                                                                              \
-    }())
+    (::TwofoldRuntime::expressionToString([&]() -> decltype(auto) { return (expr); }))
 
 namespace TwofoldRuntime {
 
@@ -43,6 +32,22 @@ template<class T>
 concept IsToStringable = requires(T a) {
     { std::to_string(a) } -> std::convertible_to<std::string>;
 };
+
+template<class Expression>
+auto expressionToString(Expression&& expression) -> std::string {
+    if constexpr (std::is_void_v<std::invoke_result_t<Expression>>) {
+        std::forward<Expression>(expression)();
+        return {};
+    } else {
+        return []<class T>(T&& value) {
+            if constexpr (IsToStringable<T>) {
+                return std::to_string(std::forward<T>(value));
+            } else {
+                return std::string(std::forward<T>(value));
+            }
+        }(std::forward<Expression>(expression)());
+    }
+}
 
 template<class Promise = void>
 struct UniqueCoroutineHandle final {

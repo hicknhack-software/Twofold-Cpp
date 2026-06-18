@@ -21,7 +21,7 @@ Project {
     id: sourceMap
 
     name: "SourceMap"
-    uri: "gh:hicknhack-software/SourceMap-Cpp#ee4759af5e939a2f40420915b26c3abcfca6e797"
+    uri: "gh:hicknhack-software/SourceMap-Cpp#d758f601c10a224ada6b0203f1554b026c5f2588"
   }
   online.QbsProject {
     source: sourceMap
