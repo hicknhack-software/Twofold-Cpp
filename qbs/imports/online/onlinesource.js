@@ -166,6 +166,24 @@ function getCacheDir(sourceCache, packageName, uriInfo) {
     return FileInfo.joinPaths(cacheBase, packageDir, versionDir);
 }
 
+function environmentSourceVariableName(packageName) {
+    return "QBS_" + packageName.replace(/[^A-Za-z0-9]+/g, "_").toUpperCase() + "_SOURCE";
+}
+
+function environmentSourcePath(packageName) {
+    var variableName = environmentSourceVariableName(packageName);
+    var sourceDir = Environment.getEnv(variableName);
+    if (!sourceDir || sourceDir.trim() === "")
+        return null;
+
+    if (!File.exists(sourceDir)) {
+        throw "OnlineSource: " + variableName + " points to a path that does not exist: " + sourceDir;
+    }
+
+    console.info("OnlineSource: Using " + variableName + "=" + sourceDir);
+    return sourceDir;
+}
+
 /**
  * Clone a git repository
  */
@@ -344,6 +362,19 @@ function fetch(options) {
         return null;
     }
 
+    var environmentDir = environmentSourcePath(name);
+    if (environmentDir) {
+        var environmentQbsInfo = detectQbsProject(environmentDir, options.projectFile);
+        if (environmentQbsInfo) {
+            console.info("OnlineSource: Detected Qbs project: " + environmentQbsInfo.projectFile);
+        }
+
+        return {
+            sourceDirectory: environmentDir,
+            projectFile: (environmentQbsInfo && environmentQbsInfo.isQbsProject) ? environmentQbsInfo.projectFile : null
+        };
+    }
+
     var cacheFile = FileInfo.joinPaths(options.buildDirectory, "online-source", "resolution-cache.json");
     var resolvedModules = loadCache(cacheFile);
 
@@ -366,27 +397,23 @@ function fetch(options) {
         throw "OnlineSource: Invalid URI '" + uri + "' for module '" + name + "'";
     }
 
-    var sourceDir;
+    var sourceDir = null;
 
-    // Handle local paths directly (no caching needed)
-    if (uriInfo.type === "local") {
+    if (uriInfo.type === "local") { // Handle local paths directly (no caching needed)
         sourceDir = uriInfo.localPath;
         if (!File.exists(sourceDir)) {
             throw "OnlineSource: Local path does not exist: " + sourceDir;
         }
         console.info("OnlineSource: Using local path " + sourceDir);
-    } else {
-        // Determine cache directory for remote sources
+    }
+    else {
         var cacheDir = getCacheDir(options.sourceCache, name, uriInfo);
         sourceDir = cacheDir;
 
-        // Check if already cached
         var alreadyCached = File.exists(cacheDir) && File.exists(FileInfo.joinPaths(cacheDir, ".onlinesource-cached"));
-
         if (!alreadyCached) {
             File.makePath(cacheDir);
 
-            // Download/clone the package
             if (uriInfo.type === "git") {
                 cloneGitRepo(uriInfo.url, uriInfo.tag, cacheDir);
             } else if (uriInfo.type === "archive") {
@@ -399,7 +426,6 @@ function fetch(options) {
                 }
             }
 
-            // Mark as cached
             var markerFile = new TextFile(FileInfo.joinPaths(cacheDir, ".onlinesource-cached"), TextFile.WriteOnly);
             markerFile.writeLine(new Date().toISOString());
             markerFile.writeLine(uri);
@@ -409,7 +435,6 @@ function fetch(options) {
         }
     }
 
-    // Detect project type
     var qbsInfo = detectQbsProject(sourceDir, options.projectFile);
     if (qbsInfo) {
         console.info("OnlineSource: Detected Qbs project: " + qbsInfo.projectFile);
@@ -420,9 +445,7 @@ function fetch(options) {
         projectFile: (qbsInfo && qbsInfo.isQbsProject) ? qbsInfo.projectFile : null
     };
 
-    // Store in resolution cache
     resolvedModules[name] = result;
     saveCache(cacheFile, resolvedModules);
-
     return result;
 }

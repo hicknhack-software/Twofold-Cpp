@@ -104,6 +104,8 @@ void PreparedTemplateBuilder::build(FileHandler::Path const& inputPath) {
         .outputBasePath = config.outputBasePath,
         .messageHandler = config.messageHandler,
         .fileHandler = config.fileHandler,
+        .codeBuilder = {},
+        .basePath = {},
     };
     builder.build(inputPath);
 }

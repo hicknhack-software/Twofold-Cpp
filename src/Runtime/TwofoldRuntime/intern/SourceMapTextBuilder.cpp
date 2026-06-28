@@ -60,7 +60,7 @@ auto SourceMapTextBuilder::operator<<(OriginText const& originText) -> SourceMap
     return *this;
 }
 
-auto SourceMapTextBuilder::operator<<(OriginNewLine const& originNewLine) -> SourceMapTextBuilder& {
+auto SourceMapTextBuilder::operator<<(OriginNewLine const&) -> SourceMapTextBuilder& {
     // auto const callerIndex = m_callerIndexStack.empty() ? CallerIndex{} : m_callerIndexStack.back();
     // auto const column = isBlankLine() ? std::max(1, originNewLine.origin.column - 1) : originNewLine.origin.column;
     // m_sourceData.addEntry(
