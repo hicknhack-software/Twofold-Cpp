@@ -7,6 +7,20 @@ namespace TwofoldRuntime {
 
 using namespace intern;
 
+auto TargetBuilder::pushSource(FilePosition origin) -> bool {
+    // Re-entering the same AST node does not introduce a new input context,
+    // even when a template call frame lies between the two source scopes.
+    if (!origin.isValid() || (!m_sourceOrigins.empty() && m_sourceOrigins.back() == origin)) return false;
+    m_sourceMapBuilder.pushCaller(origin);
+    m_sourceOrigins.push_back(std::move(origin));
+    return true;
+}
+
+void TargetBuilder::popSource() {
+    m_sourceMapBuilder.popCaller();
+    m_sourceOrigins.pop_back();
+}
+
 void TargetBuilder::append(std::string_view text, FilePosition originPosition) {
     if (!text.empty()) {
         m_sourceMapBuilder << OriginText{

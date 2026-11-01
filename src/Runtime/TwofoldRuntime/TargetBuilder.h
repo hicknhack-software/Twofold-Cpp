@@ -26,6 +26,9 @@ public:
     void pushCaller(FilePosition origin) { m_sourceMapBuilder.pushCaller(origin); }
     void popCaller() { m_sourceMapBuilder.popCaller(); }
 
+    auto pushSource(FilePosition origin) -> bool;
+    void popSource();
+
     void append(std::string_view text, FilePosition originPosition);
     void appendExpression(std::string_view text, FilePosition originPosition);
     void newLine(FilePosition originPosition);
@@ -39,6 +42,7 @@ public:
 
 private:
     SourceResolver m_sourceResolver;
+    std::vector<FilePosition> m_sourceOrigins;
     intern::SourceMapTextBuilder m_sourceMapBuilder;
     std::string m_partIndent;
     std::vector<std::pair<std::string, std::string>> m_indentationStack;

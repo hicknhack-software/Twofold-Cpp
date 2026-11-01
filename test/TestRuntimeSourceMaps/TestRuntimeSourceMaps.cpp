@@ -55,6 +55,14 @@ TEST_CASE("Nested template callers and input scopes unwind in order", "[sourcema
     CHECK(stack[0].position.line == 14);
     CHECK(stack[1].position.line == 23);
 
+    auto json = SourceMap::RevisionThree{};
+    json.encodeMappings(output.sourceMap);
+    auto decoded = decode(json.toJson());
+    auto decodedEntry = decoded.findEntryByGenerated(positionOf(output.text, "first"));
+    REQUIRE(decodedEntry);
+    CHECK(SourceMap::buildCallerStack(decoded, decodedEntry) == stack);
+    CHECK(SourceMap::get<ExtCaller>(decoded.data()) == SourceMap::get<ExtCaller>(output.sourceMap.data()));
+
     auto scopedBuilder = TwofoldRuntime::TargetBuilder{};
     scopedBuilder.setSourceResolver([](char const* location) -> TwofoldRuntime::FilePosition {
         return {std::string{"input://"} + location, {1, 1}};
@@ -92,4 +100,51 @@ TEST_CASE("Nested template callers and input scopes unwind in order", "[sourcema
     scopedBuilder.append("c", {"template://test", {1, 3}});
     auto after = scopedBuilder.build();
     CHECK(SourceMap::buildCallerStack(after.sourceMap, after.sourceMap.findEntryByGenerated({1, 3})).empty());
+}
+
+TEST_CASE("Repeated input scopes preserve template calls without duplicating the input origin", "[sourcemap]") {
+    auto builder = TwofoldRuntime::TargetBuilder{};
+    builder.setSourceResolver([](char const* location) -> TwofoldRuntime::FilePosition {
+        return {std::string{"input://"} + location, {1, 1}};
+    });
+    auto child = []() -> Twofold {
+        auto sameNode = co_await TwofoldRuntime::SourceScope{"node"};
+        co_yield TwofoldRuntime::Append{"a", {"template://child", {1, 1}}};
+        {
+            auto differentNode = co_await TwofoldRuntime::SourceScope{"nested"};
+            co_yield TwofoldRuntime::Append{"b", {"template://child", {2, 1}}};
+        }
+        co_yield TwofoldRuntime::Append{"c", {"template://child", {3, 1}}};
+    };
+    auto render = [&]() -> Twofold {
+        auto outer = co_await TwofoldRuntime::SourceScope{"node"};
+        co_yield TwofoldRuntime::PushCaller{{"template://parent", {4, 5}}};
+        co_await child();
+        co_yield TwofoldRuntime::PopCaller{};
+        co_yield TwofoldRuntime::Append{"d", {"template://parent", {6, 1}}};
+    };
+    auto result = render();
+    result.setBuilder(&builder);
+    result.run();
+    auto output = builder.build();
+    auto const expected = SourceMap::CallerStack{
+        {"template://parent", {4, 5}},
+        {"input://node", {1, 1}},
+    };
+    for (auto column : {1, 3}) {
+        auto entry = output.sourceMap.findEntryByGenerated({1, column});
+        REQUIRE(entry);
+        CHECK(SourceMap::buildCallerStack(output.sourceMap, entry) == expected);
+    }
+    auto nestedExpected = expected;
+    nestedExpected.insert(nestedExpected.begin(), {"input://nested", {1, 1}});
+    CHECK(
+        SourceMap::buildCallerStack(output.sourceMap, output.sourceMap.findEntryByGenerated({1, 2})) == nestedExpected);
+    CHECK(
+        SourceMap::buildCallerStack(output.sourceMap, output.sourceMap.findEntryByGenerated({1, 4})) ==
+        SourceMap::CallerStack{{"input://node", {1, 1}}});
+    auto json = SourceMap::RevisionThree{};
+    json.encodeMappings(output.sourceMap);
+    auto decoded = decode(json.toJson());
+    CHECK(SourceMap::get<ExtCaller>(decoded.data()) == SourceMap::get<ExtCaller>(output.sourceMap.data()));
 }

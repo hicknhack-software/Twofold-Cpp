@@ -111,7 +111,7 @@ struct SourceScope {
         Guard(Guard&& other) noexcept
             : builder(std::exchange(other.builder, nullptr)) {}
         ~Guard() {
-            if (builder) builder->popCaller();
+            if (builder) builder->popSource();
         }
     };
     auto await_ready() const noexcept -> bool { return false; }
@@ -119,8 +119,7 @@ struct SourceScope {
     auto await_suspend(std::coroutine_handle<Promise> coroutine) -> bool {
         auto* target = coroutine.promise().builder;
         auto origin = target->resolveSource(location);
-        if (origin.isValid()) {
-            target->pushCaller(std::move(origin));
+        if (target->pushSource(std::move(origin))) {
             builder = target;
         }
         return false;
