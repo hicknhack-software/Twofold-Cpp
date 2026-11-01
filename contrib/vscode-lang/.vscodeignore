@@ -4,7 +4,8 @@ node_modules/**
 *.vsix
 .gitignore
 src/**
+test/**
 out/test-*
 tsconfig.json
-*.map
-*.d.ts
+**/*.map
+**/*.d.ts

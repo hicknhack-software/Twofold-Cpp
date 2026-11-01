@@ -3,9 +3,11 @@
 
 import * as vscode from 'vscode';
 import { TwicefoldDocumentFormatter } from './formatter';
+import { registerSourceMapNavigation } from './sourceMapNavigation';
 
 export function activate(context: vscode.ExtensionContext) {
 	const twofoldFormatter = new TwicefoldDocumentFormatter();
+	registerSourceMapNavigation(context);
 
 	// Register formatter for both twofold language IDs
 	context.subscriptions.push(

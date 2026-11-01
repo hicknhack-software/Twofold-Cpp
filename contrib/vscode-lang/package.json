@@ -1,15 +1,21 @@
 {
 	"name": "twofold",
 	"displayName": "Twofold Language Support",
-	"description": "Syntax highlighting and formatting for Twofold template language",
-	"version": "0.2.7",
+	"description": "Twofold highlighting, formatting, and source map navigation with generation stacks",
+	"version": "0.3.1",
 	"publisher": "hicknhack-software",
 	"engines": {
 		"vscode": "^1.85.0"
 	},
 	"main": "./out/extension.js",
+	"activationEvents": [
+		"onStartupFinished"
+	],
 	"scripts": {
+		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
+		"test": "npm run compile && node --test test/*.test.cjs",
+		"test:extension": "npm run compile && node test/runExtensionHost.cjs",
 		"watch": "tsc -p ./ -w",
 		"package": "vsce package"
 	},
@@ -23,6 +29,47 @@
 		"Programming Languages"
 	],
 	"contributes": {
+		"commands": [
+			{
+				"command": "twofold.goToGeneratingSource",
+				"title": "Twofold: Go to Generating Source"
+			},
+			{
+				"command": "twofold.refreshSourceMap",
+				"title": "Twofold: Refresh Source Map",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "twofold.configureSourceMap",
+				"title": "Twofold: Configure Source Mapping"
+			}
+		],
+		"viewsContainers": {
+			"panel": [
+				{
+					"id": "twofold-source-maps",
+					"title": "Twofold",
+					"icon": "media/source-map.svg"
+				}
+			]
+		},
+		"views": {
+			"twofold-source-maps": [
+				{
+					"id": "twofold.sources",
+					"name": "Sources and Generation Stack"
+				}
+			]
+		},
+		"menus": {
+			"view/title": [
+				{
+					"command": "twofold.refreshSourceMap",
+					"when": "view == twofold.sources",
+					"group": "navigation"
+				}
+			]
+		},
 		"languages": [
 			{
 				"id": "twofold",
@@ -70,6 +117,15 @@
 		"configuration": {
 			"title": "Twofold",
 			"properties": {
+				"twofold.sourceMap.roots": {
+					"type": "object",
+					"default": {},
+					"additionalProperties": {
+						"type": "string"
+					},
+					"scope": "resource",
+					"markdownDescription": "Map source prefixes or full source names to local paths/URIs. Used when configured; otherwise sources are discovered throughout the workspace. Can be set globally or per workspace. File and directory bindings take precedence."
+				},
 				"twofold.targetColumn": {
 					"type": "number",
 					"default": 32,
@@ -79,6 +135,35 @@
 					"type": "string",
 					"default": "",
 					"description": "Path to clang-format executable. Uses C_Cpp.clang_format_path if not set."
+				},
+				"twofold.sourceMap.bindings": {
+					"type": "object",
+					"default": {},
+					"scope": "resource",
+					"markdownDescription": "Source roots keyed by generated file or directory URI. Use **Twofold: Configure Source Mapping** or its hover link to create bindings. File bindings override directory bindings; nearest directories override ancestors and general roots.",
+					"additionalProperties": {
+						"type": "object",
+						"required": [
+							"scope",
+							"roots"
+						],
+						"additionalProperties": false,
+						"properties": {
+							"scope": {
+								"type": "string",
+								"enum": [
+									"file",
+									"directory"
+								]
+							},
+							"roots": {
+								"type": "object",
+								"additionalProperties": {
+									"type": "string"
+								}
+							}
+						}
+					}
 				}
 			}
 		}
