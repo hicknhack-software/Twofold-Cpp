@@ -18,6 +18,7 @@
  */
 #include "CodeBuilder.h"
 
+#include <SourceMap/SourcePath.h>
 #include <format>
 
 namespace Twofold::intern {
@@ -49,21 +50,46 @@ auto buildOriginText(
     return OriginText{originPosition, span, interpolation};
 }
 
-auto originPositionText(FilePosition position) -> std::string {
+} // namespace
+
+auto CodeBuilder::originPositionText(FilePosition position) const -> std::string {
     return std::format(
         "TwofoldRuntime::FilePosition{{\"{}\", {{.line={}, .column={}}}}}",
-        position.name.string(),
+        escapeForCppString(SourceMap::keyedPath(position.name, m_sourceRoot, m_sourceKey).string()),
         position.position.line,
         position.position.column);
 }
 
-} // namespace
+void CodeBuilder::appendCppString(OriginText const& text) {
+    auto remaining = std::string_view{text.span};
+    auto origin = text.origin;
+    while (!remaining.empty()) {
+        auto escape = remaining.find_first_of("\\\r\n\"'");
+        auto plain = remaining.substr(0, escape);
+        if (!plain.empty()) {
+            m_sourceMapBuilder << OriginText{origin, plain, Interpolation::OneToOne};
+            origin.position.column += SourceMap::utf16Length(plain);
+            remaining.remove_prefix(plain.size());
+        }
+        if (!remaining.empty()) {
+            auto escaped = escapeForCppString(remaining.substr(0, 1));
+            m_sourceMapBuilder << OriginText{origin, TextSpan{escaped}, Interpolation::None};
+            ++origin.position.column;
+            remaining.remove_prefix(1);
+        }
+    }
+}
 
 using namespace std::string_literals;
 
 auto CodeBuilder::build() const -> Code {
     auto sourceMapText = m_sourceMapBuilder.build();
-    return Code{sourceMapText.text, sourceMapText.sourceMap};
+    auto data = sourceMapText.sourceMap.data();
+    for (auto& entry : data.entries)
+        entry.original.name = SourceMap::keyedPath(entry.original.name, m_sourceRoot, m_sourceKey);
+    for (auto& caller : SourceMap::get<ExtCaller>(data))
+        caller.original.name = SourceMap::keyedPath(caller.original.name, m_sourceRoot, m_sourceKey);
+    return Code{sourceMapText.text, SourceMapping{std::move(data)}};
 }
 
 auto CodeBuilder::operator<<(OriginPart const& part) -> CodeBuilder& {
@@ -80,7 +106,7 @@ auto CodeBuilder::operator<<(OriginScriptCall const& script) -> CodeBuilder& {
     m_sourceMapBuilder << script.text;
     if (script.text.span.end == script.text.span.begin || script.text.span.end[-1] != ';') {
         static constexpr auto semicolon = std::string_view{";"};
-        auto const originLength = std::distance(script.text.span.begin, script.text.span.end);
+        auto const originLength = SourceMap::utf16Length(std::string_view{script.text.span});
         m_sourceMapBuilder << buildOriginText(script.text.origin, originLength, semicolon, Interpolation::None); // ;
     }
     m_sourceMapBuilder << NewLine();
@@ -88,19 +114,22 @@ auto CodeBuilder::operator<<(OriginScriptCall const& script) -> CodeBuilder& {
 }
 
 auto CodeBuilder::operator<<(OriginScriptExpression const& expr) -> CodeBuilder& {
-    if (0 == std::distance(expr.text.span.begin, expr.text.span.end)) return *this; // avoid empty script expressions
+    if (0 == SourceMap::utf16Length(std::string_view{expr.text.span})) return *this; // avoid empty script expressions
 
-    auto const originLength = std::distance(expr.text.span.begin, expr.text.span.end);
+    auto const originLength = SourceMap::utf16Length(std::string_view{expr.text.span});
     auto const originText = originPositionText(expr.text.origin);
 
     static constexpr auto coawaitView = std::string_view{"co_await"};
     if (std::search(expr.text.span.begin, expr.text.span.end, coawaitView.begin(), coawaitView.end()) !=
         expr.text.span.end) {
+        auto const push = std::format("co_yield TwofoldRuntime::PushCaller{{{}}};", originText);
+        m_sourceMapBuilder << buildOriginText(expr.text.origin, -2, push);
         m_sourceMapBuilder << expr.text;
         if (expr.text.span.end == expr.text.span.begin || expr.text.span.end[-1] != ';') {
             static constexpr auto semicolon = std::string_view{";"};
             m_sourceMapBuilder << buildOriginText(expr.text.origin, originLength, semicolon, Interpolation::None); // ;
         }
+        m_sourceMapBuilder << buildOriginText(expr.text.origin, originLength, "co_yield TwofoldRuntime::PopCaller{};");
         m_sourceMapBuilder << NewLine();
         return *this;
     }
@@ -119,16 +148,16 @@ auto CodeBuilder::operator<<(OriginScriptExpression const& expr) -> CodeBuilder&
 }
 
 auto CodeBuilder::operator<<(OriginTarget const& target) -> CodeBuilder& {
-    if (0 == std::distance(target.text.span.begin, target.text.span.end)) return *this; // avoid empty text
+    if (0 == SourceMap::utf16Length(std::string_view{target.text.span})) return *this; // avoid empty text
 
-    auto const originLength = std::distance(target.text.span.begin, target.text.span.end);
+    auto const originLength = SourceMap::utf16Length(std::string_view{target.text.span});
     auto const originText = originPositionText(target.text.origin);
 
     auto const prefix = "co_yield TwofoldRuntime::Append{\""s;
     auto const postfix = std::format("\", {}}};", originText);
 
     m_sourceMapBuilder << buildOriginText(target.text.origin, -1, prefix, Interpolation::None);
-    m_sourceMapBuilder << OriginText{target.text.origin, TextSpan{escapeForCppString(target.text.span)}};
+    appendCppString(target.text);
     m_sourceMapBuilder << buildOriginText(target.text.origin, originLength, postfix, Interpolation::None);
     m_sourceMapBuilder << NewLine();
     return *this;
@@ -137,14 +166,14 @@ auto CodeBuilder::operator<<(OriginTarget const& target) -> CodeBuilder& {
 auto CodeBuilder::operator<<(IndentTargetPart const& indent) -> CodeBuilder& {
     using namespace std::string_literals;
 
-    auto const originLength = std::distance(indent.text.span.begin, indent.text.span.end);
+    auto const originLength = SourceMap::utf16Length(std::string_view{indent.text.span});
     auto const originText = originPositionText(indent.text.origin);
 
     auto const prefix = "co_yield TwofoldRuntime::IndentPart{\""s;
     auto const postfix = std::format("\", {}}};", originText);
 
     m_sourceMapBuilder << buildOriginText(indent.text.origin, -1, prefix, Interpolation::None);
-    m_sourceMapBuilder << OriginText{indent.text.origin, TextSpan{escapeForCppString(indent.text.span)}};
+    appendCppString(indent.text);
     m_sourceMapBuilder << buildOriginText(indent.text.origin, originLength, postfix, Interpolation::None);
     m_sourceMapBuilder << NewLine();
     return *this;
@@ -152,14 +181,14 @@ auto CodeBuilder::operator<<(IndentTargetPart const& indent) -> CodeBuilder& {
 
 auto CodeBuilder::operator<<(PushTargetIndentation const& indent) -> CodeBuilder& {
     using namespace std::string_literals;
-    auto const originLength = std::distance(indent.text.span.begin, indent.text.span.end);
+    auto const originLength = SourceMap::utf16Length(std::string_view{indent.text.span});
     auto const originText = originPositionText(indent.text.origin);
 
     auto const prefix = "co_yield TwofoldRuntime::PushIndentation{\""s;
     auto const postfix = std::format("\", {}}};", originText);
 
     m_sourceMapBuilder << buildOriginText(indent.text.origin, -1, prefix, Interpolation::None);
-    m_sourceMapBuilder << OriginText{indent.text.origin, TextSpan{escapeForCppString(indent.text.span)}};
+    appendCppString(indent.text);
     m_sourceMapBuilder << buildOriginText(indent.text.origin, originLength, postfix, Interpolation::None);
     m_sourceMapBuilder << NewLine();
     return *this;

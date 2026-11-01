@@ -21,6 +21,7 @@
 #include "TwofoldGenerator/SourceMap.h"
 #include "TwofoldGenerator/intern/LineProcessor.h"
 #include "TwofoldGenerator/intern/TextBuilder.h"
+#include <SourceMap/TextPosition.h>
 
 namespace Twofold::intern {
 
@@ -35,7 +36,10 @@ struct OriginText {
     /// construct from a FileLine of a LineProcessor
     inline OriginText(
         FileLine const& line, TextSpan span, Twofold::Interpolation interpolation = Twofold::Interpolation::OneToOne)
-        : origin{.name = line.position.name, .position = {line.position.position.line, 1 + static_cast<int>(span.begin - line.begin)}}
+        : origin{
+              .name = line.position.name,
+              .position =
+                  {line.position.position.line, 1 + SourceMap::utf16Length(std::string_view{line.begin, span.begin})}}
         , span{span}
         , interpolation{interpolation} {}
 

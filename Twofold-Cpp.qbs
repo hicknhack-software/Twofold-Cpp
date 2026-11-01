@@ -106,6 +106,8 @@ Project {
         name: "TwofoldCodeGen"
 
         Export {
+            property path sourceRoot: importingProduct.sourceDirectory
+            property string sourceKey: "template"
             cpp.includePaths: [ FileInfo.joinPaths(importingProduct.buildDirectory, "twofold-generated") ]
 
             additionalProductTypes: ["hpp", "cpp"]
@@ -121,7 +123,7 @@ Project {
             Rule {
                 inputs: ["hpp-twofold", "cpp-twofold"]
                 explicitlyDependsOnFromDependencies: ["twofold-generator"]
-                outputFileTags: ["hpp", "cpp"]
+                outputFileTags: ["hpp", "cpp", "source-map"]
                 outputArtifacts: {
                     var artifacts = [];
                     // var executablePath = inputs["application"][0].filePath; // TODO: use --preview to get all generated files
@@ -134,6 +136,10 @@ Project {
                             artifacts.push({
                                 filePath: FileInfo.joinPaths(product.buildDirectory, "twofold-generated", input.completeBaseName),
                                 fileTags: [inTag.substring(0, 3)]
+                            });
+                            artifacts.push({
+                                filePath: FileInfo.joinPaths(product.buildDirectory, "twofold-generated", input.completeBaseName + ".map"),
+                                fileTags: ["source-map"]
                             });
                         }
                     }
@@ -148,7 +154,7 @@ Project {
                         if (!inputs[inTag]) continue;
                         for (var i = 0; i < inputs[inTag].length; i++) {
                             var inputFilePath = inputs[inTag][i].filePath;
-                            var args = ["-i", inputFilePath, "-o", FileInfo.joinPaths(product.buildDirectory, "twofold-generated")];
+                            var args = ["-i", inputFilePath, "-o", FileInfo.joinPaths(product.buildDirectory, "twofold-generated"), "--source-root", product.TwofoldCodeGen.sourceRoot, "--source-key", product.TwofoldCodeGen.sourceKey];
                             var cmd = new Command(executablePath, args);
                             cmd.description = "folding " + FileInfo.relativePath(product.sourceDirectory, inputFilePath);
                             cmd.highlight = "codegen";

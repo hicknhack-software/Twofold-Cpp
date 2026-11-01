@@ -39,7 +39,8 @@ struct InterpolationTestData {
 };
 
 auto s_pos = [](int line, int col) {
-    return std::format("TwofoldRuntime::FilePosition{{\"testTemplate\", {{.line={}, .column={}}}}}", line, col);
+    return std::format(
+        "TwofoldRuntime::FilePosition{{\"template://testTemplate\", {{.line={}, .column={}}}}}", line, col);
 };
 
 auto s_newLine = [](int line, int col) {
@@ -61,9 +62,10 @@ auto s_expression = [](std::string text, int line, int col) {
         text);
 };
 
-auto s_callExpression = [](std::string text, int line, int col) {
-    auto pos = s_pos(line, col);
-    return std::format("co_yield TwofoldRuntime::Append{{{0}}};", text);
+auto s_inlineCall = [](int line, int col) {
+    return std::format(
+        "co_yield TwofoldRuntime::PushCaller{{{}}};co_await test();co_yield TwofoldRuntime::PopCaller{{}};\n",
+        s_pos(line, col));
 };
 
 } // namespace
@@ -119,11 +121,11 @@ TEST_CASE("TestTemplateBuilder Interpolation", "[interpolation]") {
         InterpolationTestData{
             "call expr shorthand",
             "|#{co_await test()}",
-            s_indentPart("", 1, 2) + "co_await test();\n" + s_newLine(1, 20)},
+            s_indentPart("", 1, 2) + s_inlineCall(1, 4) + s_newLine(1, 20)},
         InterpolationTestData{
             "call expr shorthand with text",
             "|prefix #{co_await test()} suffix",
-            s_indentPart("", 1, 2) + s_output("prefix ", 1, 2) + "co_await test();\n" + s_output(" suffix", 1, 27) +
+            s_indentPart("", 1, 2) + s_output("prefix ", 1, 2) + s_inlineCall(1, 11) + s_output(" suffix", 1, 27) +
                 s_newLine(1, 34)});
 
     SECTION(data.name) {
@@ -140,60 +142,9 @@ TEST_CASE("TestTemplateBuilder Interpolation", "[interpolation]") {
 
         CAPTURE(data.name);
         CHECK(messageHandler->messages().empty());
-        REQUIRE(fileHandler->savedFiles().size() == 1);
-        CHECK(fileHandler->savedFiles()[0].generatedContent == data.expectedCpp);
+        REQUIRE(fileHandler->savedFiles().size() == 2);
+        CHECK(
+            fileHandler->savedFiles()[1].generatedContent ==
+            data.expectedCpp + "\n//# sourceMappingURL=testTemplate.map\n");
     }
 }
-
-// note: source maps are not generated yet.
-// TEST_CASE("TestTemplateBuilder SourceMap", "[sourcemap]") {
-//     struct SourceMapTestData {
-//         std::string name;
-//         std::string templateText;
-//         std::string searchText;
-//         int templateLine;
-//         int templateColumn;
-//     };
-
-//     auto data = GENERATE(
-//         SourceMapTestData{"inline expression 0", "if(test) { return 1 : 2 }", "1 : 2", 1, 19},
-//         SourceMapTestData{"inline expression 1", "| simple #{(test)? 1 : 2 )}", "1 : 2", 1, 20},
-//         SourceMapTestData{"inline expression 2", "| simple \n|#{'hello'}", "hello", 2, 5},
-//         SourceMapTestData{"generated code 1", "| simple \n|#{'hello'}", "appendExpression('hello", 2, 2},
-//         SourceMapTestData{"generated code 2", "|#{'hello'}", ", 1);_template.pop", 1, 11});
-
-//     SECTION(data.name) {
-//         auto messageHandler = std::make_shared<MessageHandlerMemory>();
-//         auto fileHandler =
-//             std::make_shared<FileHandlerMemory>(FileHandlerMemory::FileMap{{"testTemplate", data.templateText}});
-
-//         PreparedTemplateBuilder builder(messageHandler, fileHandler);
-//         // build returns void, so we can't get the SourceMap here yet.
-//         builder.build("testTemplate");
-
-//         REQUIRE(fileHandler->savedFiles().size() == 1);
-//         auto const& generatedCode = fileHandler->savedFiles()[0].generatedContent;
-
-//         auto jsBegin = generatedCode.begin();
-//         auto jsEnd = generatedCode.end();
-
-//         auto it = std::search(jsBegin, jsEnd, data.searchText.begin(), data.searchText.end());
-//         REQUIRE(it != jsEnd);
-
-//         auto rit = std::find(std::reverse_iterator(it), std::reverse_iterator(jsBegin), '\n');
-//         auto lastNewLine = rit.base();
-
-//         int generatedColumn = static_cast<int>(std::distance(lastNewLine, it)) + 1;
-//         int generatedLine = static_cast<int>(std::count(jsBegin, it, '\n')) + 1;
-
-//         // getOriginalPositionFromGenerated needs result.sourceMap, which is not exposed.
-//         // auto source = getOriginalPositionFromGenerated(result.sourceMap, {generatedLine, generatedColumn});
-
-//         CAPTURE(data.name);
-//         CAPTURE(generatedCode);
-//         CAPTURE(generatedLine);
-//         CAPTURE(generatedColumn);
-//         // CHECK(source.position.line == data.templateLine);
-//         // CHECK(source.position.column == data.templateColumn);
-//     }
-// }

@@ -8,6 +8,8 @@ CppApplication {
     Depends { name: "catch2-with-main" }
 
     files: [
-        "TestTemplateBuilder.cpp"
+        "TestTemplateBuilder.cpp",
+        "TestTemplateSourceMaps.cpp",
+        "../SourceMapTestSupport.h"
     ]
 }

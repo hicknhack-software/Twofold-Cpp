@@ -18,12 +18,13 @@
  */
 #include "TextBuilder.h"
 
+#include <SourceMap/TextPosition.h>
 #include <algorithm>
 
 namespace Twofold::intern {
 
 auto TextBuilder::column() const -> int {
-    if (0 == m_column) return 1 + m_indentation.size();
+    if (0 == m_column) return 1 + SourceMap::utf16Length(m_indentation);
     return m_column;
 }
 
@@ -41,8 +42,8 @@ auto TextBuilder::operator<<(std::string_view text) -> TextBuilder& {
             ++line_end;
         }
         else {
-            if (0 == column) column = 1 + m_indentation.size();
-            column += std::distance(it, end);
+            if (0 == column) column = 1 + SourceMap::utf16Length(m_indentation);
+            column += SourceMap::utf16Length(std::string_view{it, end});
         }
         m_buffer += std::string_view{it, line_end};
         if (line_end == end) break; // end of text reached

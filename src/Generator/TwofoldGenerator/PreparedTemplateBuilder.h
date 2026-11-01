@@ -29,6 +29,8 @@ struct PreparedTemplateBuilder {
         Path outputBasePath;
         MessageHandlerPtr messageHandler;
         FileHandlerPtr fileHandler;
+        Path sourceRoot{};
+        std::string sourceKey = "template";
     };
     PreparedTemplateBuilder(Config config)
         : config{std::move(config)} {}

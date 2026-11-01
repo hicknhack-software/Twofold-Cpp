@@ -29,7 +29,10 @@ public:
     explicit MessageHandlerOstream(std::ostream& output)
         : m_output(output) {}
 
+    auto hasErrors() const -> bool { return m_hasErrors; }
+
     void message(Type type, Text const& text) override {
+        if (type == Type::Error) m_hasErrors = true;
         switch (type) {
         case Type::Info: m_output << "Info:" << text << '\n'; break;
         case Type::Warning: m_output << "Warning:" << text << '\n'; break;
@@ -46,6 +49,7 @@ public:
 
 private:
     std::ostream& m_output;
+    bool m_hasErrors = false;
 };
 
 } // namespace Twofold

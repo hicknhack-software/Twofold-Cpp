@@ -1,0 +1,24 @@
+// SPDX-FileCopyrightText: 2026 HicknHack Software GmbH
+// SPDX-License-Identifier: Apache-2.0
+
+#pragma once
+#include <TwofoldRuntime/Twofold.h>
+
+inline auto sourceMapHelper() -> std::string { return "helper"; }
+
+inline auto sourceMapLeaf(std::string const& value) -> Twofold {
+        |leaf: #{value}
+}
+
+inline auto sourceMapFixture() -> Twofold {
+        =  co_await sourceMapLeaf("first\nsecond")
+        |inline #{co_await sourceMapLeaf("inside")} suffix
+        =co_await sourceMapLeaf("sibling")
+        |##{escaped} #{sourceMapHelper()}
+        |é😀 end
+        \tail
+}
+
+inline auto sourceMapDeep() -> Twofold {
+        =   co_await sourceMapFixture()
+}

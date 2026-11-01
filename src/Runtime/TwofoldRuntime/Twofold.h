@@ -20,11 +20,11 @@
 #include "TargetBuilder.h"
 
 #include <coroutine>
+#include <exception>
 #include <string>
 #include <utility>
 
-#define TWOFOLD_EXPR(expr)                                                                                             \
-    (::TwofoldRuntime::expressionToString([&]() -> decltype(auto) { return (expr); }))
+#define TWOFOLD_EXPR(expr) (::TwofoldRuntime::expressionToString([&]() -> decltype(auto) { return (expr); }))
 
 namespace TwofoldRuntime {
 
@@ -38,11 +38,13 @@ auto expressionToString(Expression&& expression) -> std::string {
     if constexpr (std::is_void_v<std::invoke_result_t<Expression>>) {
         std::forward<Expression>(expression)();
         return {};
-    } else {
+    }
+    else {
         return []<class T>(T&& value) {
             if constexpr (IsToStringable<T>) {
                 return std::to_string(std::forward<T>(value));
-            } else {
+            }
+            else {
                 return std::string(std::forward<T>(value));
             }
         }(std::forward<Expression>(expression)());
@@ -107,15 +109,49 @@ struct PushPartIndent {
     FilePosition originPosition;
 };
 struct PopPartIndent {};
+struct PushCaller {
+    FilePosition originPosition;
+};
+struct PopCaller {};
+
+// Input origins are explicit: ordinary C++ helper calls never enter the stack.
+struct SourceScope {
+    char const* location{};
+    TargetBuilder* builder{};
+    struct Guard {
+        TargetBuilder* builder{};
+        Guard(TargetBuilder* builder)
+            : builder(builder) {}
+        Guard(Guard const&) = delete;
+        Guard(Guard&& other) noexcept
+            : builder(std::exchange(other.builder, nullptr)) {}
+        ~Guard() {
+            if (builder) builder->popCaller();
+        }
+    };
+    auto await_ready() const noexcept -> bool { return false; }
+    template<class Promise>
+    auto await_suspend(std::coroutine_handle<Promise> coroutine) -> bool {
+        auto* target = coroutine.promise().builder;
+        auto origin = target->resolveSource(location);
+        if (origin.isValid()) {
+            target->pushCaller(std::move(origin));
+            builder = target;
+        }
+        return false;
+    }
+    auto await_resume() -> Guard { return Guard{builder}; }
+};
 
 struct Twofold {
     struct promise_type {
         TargetBuilder* builder{};
+        std::exception_ptr exception;
 
         auto initial_suspend() noexcept { return std::suspend_always{}; }
         auto final_suspend() noexcept { return std::suspend_always{}; }
 
-        void unhandled_exception() {}
+        void unhandled_exception() { exception = std::current_exception(); }
         void return_void() const noexcept {}
 
         auto get_return_object() {
@@ -123,6 +159,14 @@ struct Twofold {
             return Twofold{.handle = UniqueCoroutine{handle}};
         }
 
+        auto yield_value(PushCaller caller) {
+            builder->pushCaller(std::move(caller.originPosition));
+            return std::suspend_never{};
+        }
+        auto yield_value(PopCaller) {
+            builder->popCaller();
+            return std::suspend_never{};
+        }
         auto yield_value(Append append) {
             builder->append(append.text, append.originPosition);
             return std::suspend_never{};
@@ -170,9 +214,16 @@ struct Twofold {
                 m_coroutine.resume(); // run called generator
                 return false; // resume the awaitingCoroutine
             }
-            void await_resume() const noexcept {}
+            void await_resume() const {
+                if (auto exception = m_coroutine.promise().exception) std::rethrow_exception(exception);
+            }
         };
         return Awaiter{handle};
+    }
+
+    void run() {
+        handle.resume();
+        if (auto exception = static_cast<Coroutine>(handle).promise().exception) std::rethrow_exception(exception);
     }
 
     void setBuilder(TargetBuilder* builder) { static_cast<Coroutine>(handle).promise().builder = builder; }

@@ -31,7 +31,9 @@
 #include "TwofoldGenerator/intern/CodeBuilder.h"
 #include "TwofoldGenerator/intern/LineProcessor.h"
 
+#include <SourceMap/RevisionThree.h>
 #include <format>
+#include <stdexcept>
 
 namespace Twofold {
 using namespace intern;
@@ -43,6 +45,8 @@ struct BuilderPrivate {
     std::filesystem::path const& outputBasePath;
     MessageHandlerPtr const& messageHandler;
     FileHandlerPtr const& fileHandler;
+    Path sourceRoot;
+    std::string sourceKey;
     CodeBuilder codeBuilder;
     LineProcessor lineProcessor{buildLineProcessor()};
     std::filesystem::path basePath;
@@ -66,12 +70,24 @@ struct BuilderPrivate {
         return {std::move(map), Command::Passthrough{codeBuilder}};
     }
 
+    void saveCode(Path const& input, Code const& code) {
+        auto output = outputBasePath / outputFilePath(input);
+        auto map = SourceMap::RevisionThree{};
+        map.storeFile(output.filename());
+        map.encodeMappings(code.sourceMap);
+        auto mapName = output.filename().string() + ".map";
+        if (fileHandler->save(Path{output.string() + ".map"}, map.toJson()) != FileHandler::SaveStatus::Success ||
+            fileHandler->save(output, code.content + "\n//# sourceMappingURL=" + mapName + "\n") !=
+                FileHandler::SaveStatus::Success)
+            throw std::runtime_error("Could not save prepared template and map: " + output.string());
+    }
+
     void buildInclude(Path const& file_path, std::string const& text) {
-        auto oldCodeBuilder = std::exchange(codeBuilder, CodeBuilder{});
+        auto oldCodeBuilder = std::exchange(codeBuilder, CodeBuilder{sourceRoot, sourceKey});
 
         lineProcessor(file_path, text);
         auto const code = codeBuilder.build();
-        fileHandler->save(outputBasePath / outputFilePath(file_path), code.content);
+        saveCode(file_path, code);
 
         std::exchange(codeBuilder, std::move(oldCodeBuilder));
     }
@@ -87,7 +103,7 @@ struct BuilderPrivate {
 
         lineProcessor(result.name, result.text);
         auto const code = codeBuilder.build();
-        fileHandler->save(outputBasePath / outputFilePath(result.name), code.content);
+        saveCode(result.name, code);
     }
 
     auto outputFilePath(std::filesystem::path inputPath) const -> std::filesystem::path {
@@ -104,7 +120,10 @@ void PreparedTemplateBuilder::build(FileHandler::Path const& inputPath) {
         .outputBasePath = config.outputBasePath,
         .messageHandler = config.messageHandler,
         .fileHandler = config.fileHandler,
-        .codeBuilder = {},
+        .sourceRoot = config.sourceRoot.empty() ? inputPath.parent_path() : config.sourceRoot,
+        .sourceKey = config.sourceKey,
+        .codeBuilder =
+            CodeBuilder{config.sourceRoot.empty() ? inputPath.parent_path() : config.sourceRoot, config.sourceKey},
         .basePath = {},
     };
     builder.build(inputPath);

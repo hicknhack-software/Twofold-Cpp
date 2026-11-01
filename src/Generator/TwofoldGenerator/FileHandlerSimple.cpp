@@ -11,7 +11,7 @@ auto FileHandlerSimple::load(Path const& file_path) const -> LoadResult {
         return {LoadStatus::NotFound, {}, {}};
     }
 
-    auto ifs = std::ifstream{file_path};
+    auto ifs = std::ifstream{file_path, std::ios::binary};
     if (ifs.fail() && !ifs.eof()) {
         return {LoadStatus::ErrorLoading, {}, {}};
     }
@@ -21,9 +21,9 @@ auto FileHandlerSimple::load(Path const& file_path) const -> LoadResult {
 }
 
 auto FileHandlerSimple::save(Path const& filePath, std::string_view content) const -> SaveStatus {
-    std::filesystem::create_directories(filePath.root_path());
+    if (filePath.has_parent_path()) std::filesystem::create_directories(filePath.parent_path());
 
-    auto ofs = std::ofstream{filePath, std::ios::trunc};
+    auto ofs = std::ofstream{filePath, std::ios::trunc | std::ios::binary};
     if (ofs.fail()) {
         return SaveStatus::ErrorSaving;
     }

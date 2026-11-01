@@ -32,6 +32,8 @@ struct Arguments {
     std::filesystem::path input_file_name;
     std::filesystem::path output_directory;
     bool is_preview = false;
+    std::filesystem::path source_root;
+    std::string source_key = "template";
 };
 
 void printUsage(std::string_view programName) {
@@ -39,6 +41,8 @@ void printUsage(std::string_view programName) {
               << "Options:\n"
               << "  -i, --input <file>     Input file\n"
               << "  -o, --output <dir>     Output directory\n"
+              << "  --source-root <dir>    Ancestor directory for template paths\n"
+              << "  --source-key <key>     Path key (default: template)\n"
               << "  --preview              Enable preview mode\n"
               << "  -h, --help             Print this help and exit\n";
 }
@@ -68,6 +72,12 @@ Arguments parseArguments(int argc, char const** argv) {
                 std::cerr << "Error: Missing output directory.\n";
                 std::exit(1);
             }
+        }
+        else if ((arg == "--source-root" || arg == "--source-key") && i + 1 < argc) {
+            if (arg == "--source-root")
+                args.source_root = argv[++i];
+            else
+                args.source_key = argv[++i];
         }
         else if (arg == "--preview") {
             args.is_preview = true;
@@ -101,8 +111,17 @@ int main(int argc, char const** argv) {
         .outputBasePath = args.output_directory,
         .messageHandler = messageHandler,
         .fileHandler = fileHandler,
+        .sourceRoot = args.source_root,
+        .sourceKey = args.source_key,
     }};
-    builder.build(args.input_file_name);
+    try {
+        builder.build(args.input_file_name);
+    }
+    catch (std::exception const& error) {
+        std::cerr << "Error: " << error.what() << '\n';
+        return 1;
+    }
+    if (messageHandler->hasErrors()) return 1;
 
     if (previewHandler) {
         for (auto const& file : previewHandler->savedFiles()) {

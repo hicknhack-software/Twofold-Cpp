@@ -61,6 +61,10 @@ struct Code {
 /// builder class
 class CodeBuilder {
 public:
+    CodeBuilder() = default;
+    CodeBuilder(std::filesystem::path root, std::string key)
+        : m_sourceRoot(std::move(root))
+        , m_sourceKey(std::move(key)) {}
     auto build() const -> Code;
 
     inline auto indentation() const -> std::string_view { return m_sourceMapBuilder.indentation(); }
@@ -82,6 +86,10 @@ public:
     auto operator<<(NewLine const) -> CodeBuilder&;
 
 private:
+    auto originPositionText(FilePosition position) const -> std::string;
+    void appendCppString(OriginText const& text);
+    std::filesystem::path m_sourceRoot;
+    std::string m_sourceKey = "template";
     SourceMapTextBuilder m_sourceMapBuilder;
 };
 

@@ -3,7 +3,8 @@ Project {
     references: [
         "TestTemplateBuilder/TestTemplateBuilder.qbs",
         "TestBenchmark/TestBenchmark.qbs",
-        "TestLines/TestLines.qbs"
+        "TestLines/TestLines.qbs",
+        "TestRuntimeSourceMaps/TestRuntimeSourceMaps.qbs"
     ]
 
     AutotestRunner {}
