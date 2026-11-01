@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 HicknHack Software GmbH
+// SPDX-License-Identifier: MIT
+
 import "onlinesource.js" as OnlineSource
 
 Probe {

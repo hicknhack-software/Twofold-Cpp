@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 HicknHack Software GmbH
+// SPDX-License-Identifier: Apache-2.0
+
 import * as fs from 'fs';
 import { TwofoldFormatter } from './formatter.js';
 

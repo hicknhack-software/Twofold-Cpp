@@ -177,7 +177,14 @@ Twofold is simple. We find it very useful as it is.
 Apache License Version 2.0
 See LICENSE file for more details
 
+The copied Qbs-OnlineSource helpers retain their MIT license.
+
 ## Contribute
+
+On Linux, run `./scripts/format_code.sh` to update SPDX headers and format C++ sources (requires Bash, Git, and standard shell tools).
+Use `--headers-only` to update headers without clang-format, or `--clang-format <path>` to select its executable.
+With PowerShell, run `./scripts/format_code.ps1` using `-HeadersOnly` or `-ClangFormat <path>` for the same options.
+Both scripts work from any working directory and include new source files that Git does not ignore.
 
 If you like this project give it a star.
 If you don't like it or found a bug, please write an issue.

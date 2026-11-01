@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 HicknHack Software GmbH
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 #include "TwofoldRuntime/Twofold.h"
 #include "lib.hpp.twofold"

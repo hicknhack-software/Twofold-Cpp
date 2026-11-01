@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 HicknHack Software GmbH
+// SPDX-License-Identifier: MIT
+
 // MIT License
 // [[
 //     Copyright 2026 HicknHack Sotware GmbH
